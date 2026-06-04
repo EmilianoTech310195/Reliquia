@@ -1649,27 +1649,62 @@ function render(){
     cx.fillStyle='#fff7d0';cx.fillRect(c.x-5,c.y-6+b,2,2);});
   // mobs (sprites con dirección y animación)
   mobs.forEach(m=>drawMob(m));
-  // boss: Nuxlor, dios del lodo
+  // boss: Rey de Piedra — coloso pétreo coronado de calaveras
   if(boss&&boss.alive){
     const bx=boss.x,by=boss.y,R=boss.r,fl=boss.hit>0;
-    cx.fillStyle='rgba(0,25,0,.5)';cx.beginPath();cx.ellipse(bx,by+R-2,R,R*0.4,0,0,7);cx.fill();
-    const pulse=Math.sin(waterFrame*0.08)*2;
-    // masa de lodo en capas
-    cx.fillStyle=fl?'#fff':'#28401a';cx.beginPath();cx.ellipse(bx,by+3,R,R-2+pulse,0,0,7);cx.fill();
-    cx.fillStyle=fl?'#fff':'#3a5e22';cx.beginPath();cx.ellipse(bx,by,R-3,R-6+pulse,0,0,7);cx.fill();
-    cx.fillStyle=fl?'#fff':'#52822e';cx.beginPath();cx.ellipse(bx-5,by-5,R-10,R-12,0,0,7);cx.fill();
-    cx.fillStyle='rgba(255,255,255,.3)';cx.beginPath();cx.ellipse(bx-7,by-8,5,3,0,0,7);cx.fill();
-    // chorreaduras
-    cx.fillStyle=fl?'#fff':'#28401a';
-    px2(bx-16,by+R-4,7,9,fl?'#fff':'#28401a');px2(bx+9,by+R-2,6,8,fl?'#fff':'#28401a');
-    // corona de dios
-    cx.fillStyle='#c4a020';
-    [[-18,-4],[18,-4]].forEach(([ox])=>{cx.beginPath();cx.moveTo(bx+ox,by-R+2);cx.lineTo(bx+ox-4,by-R-10);cx.lineTo(bx+ox+4,by-R-4);cx.fill();});
-    cx.beginPath();cx.moveTo(bx,by-R-2);cx.lineTo(bx-6,by-R-14);cx.lineTo(bx+6,by-R-14);cx.fill();
-    cx.fillStyle='#e8c547';cx.beginPath();cx.arc(bx,by-R-12,3,0,7);cx.fill();
-    // ojos ardientes
-    cx.fillStyle='#e34';cx.beginPath();cx.arc(bx-9,by-2,5,0,7);cx.fill();cx.beginPath();cx.arc(bx+9,by-2,5,0,7);cx.fill();
-    cx.fillStyle='#ff0';cx.beginPath();cx.arc(bx-9,by-2,2,0,7);cx.fill();cx.beginPath();cx.arc(bx+9,by-2,2,0,7);cx.fill();
+    const S=c=>fl?'#fff':c;
+    const breath=Math.sin(waterFrame*0.06)*1.5;       // respira lento
+    const eyeGlow=0.55+Math.sin(waterFrame*0.15)*0.45; // ojos que laten
+    // sombra
+    cx.fillStyle='rgba(0,18,0,.55)';cx.beginPath();cx.ellipse(bx,by+R+4,R+4,R*0.4,0,0,7);cx.fill();
+    // ---- cuerpo: coloso (trapecio de piedra) ----
+    cx.fillStyle=S('#34342e');
+    cx.beginPath();cx.moveTo(bx-R+2,by-R+10);cx.lineTo(bx+R-2,by-R+10);
+    cx.lineTo(bx+R+6,by+R+6);cx.lineTo(bx-R-6,by+R+6);cx.closePath();cx.fill();
+    // hombreras
+    cx.fillStyle=S('#4e4e44');
+    cx.beginPath();cx.ellipse(bx-R-2,by-2+breath,9,11,0,0,7);cx.fill();
+    cx.beginPath();cx.ellipse(bx+R+2,by-2+breath,9,11,0,0,7);cx.fill();
+    cx.fillStyle=S('#6a6a5c');
+    cx.beginPath();cx.ellipse(bx-R-3,by-5+breath,4,4,0,0,7);cx.fill();
+    cx.beginPath();cx.ellipse(bx+R+1,by-5+breath,4,4,0,0,7);cx.fill();
+    // ---- cabeza-ídolo (bloque central con caras de luz) ----
+    const hy=by-6+breath;
+    rr(bx-R+4,hy-R+6,2*R-8,2*R-10,6,S('#5e5e54'));
+    rr(bx-R+4,hy-R+6,2*R-8,6,4,S('#82826f'));          // luz frente
+    rr(bx-R+4,hy+R-12,2*R-8,6,4,S('#3a3a32'));         // sombra mentón
+    rr(bx-R+4,hy-R+6,6,2*R-10,4,S('#74746a'));         // luz izq
+    rr(bx+R-10,hy-R+6,6,2*R-10,4,S('#46463e'));        // sombra der
+    // ceño pesado
+    cx.fillStyle=S('#46463e');
+    cx.beginPath();cx.moveTo(bx-15,hy-4);cx.lineTo(bx-2,hy-7);cx.lineTo(bx-2,hy-2);cx.lineTo(bx-15,hy+1);cx.closePath();cx.fill();
+    cx.beginPath();cx.moveTo(bx+15,hy-4);cx.lineTo(bx+2,hy-7);cx.lineTo(bx+2,hy-2);cx.lineTo(bx+15,hy+1);cx.closePath();cx.fill();
+    // cuencas + ojos de fuego
+    cx.fillStyle=S('#26261f');
+    cx.beginPath();cx.ellipse(bx-9,hy+1,5,4,0,0,7);cx.fill();cx.beginPath();cx.ellipse(bx+9,hy+1,5,4,0,0,7);cx.fill();
+    cx.save();cx.globalAlpha=eyeGlow;
+    cx.fillStyle='#ff7a2a';cx.beginPath();cx.arc(bx-9,hy+1,3.2,0,7);cx.fill();cx.beginPath();cx.arc(bx+9,hy+1,3.2,0,7);cx.fill();
+    cx.fillStyle='#ffe070';cx.beginPath();cx.arc(bx-9,hy+1,1.4,0,7);cx.fill();cx.beginPath();cx.arc(bx+9,hy+1,1.4,0,7);cx.fill();
+    cx.restore();
+    // nariz angular
+    cx.fillStyle=S('#46463e');cx.beginPath();cx.moveTo(bx,hy+2);cx.lineTo(bx-3,hy+9);cx.lineTo(bx+3,hy+9);cx.closePath();cx.fill();
+    // boca con colmillos de piedra
+    rr(bx-11,hy+11,22,6,2,S('#201f1a'));
+    cx.fillStyle=S('#cfcabb');
+    for(let i=0;i<5;i++){const tx=bx-9+i*4.5;cx.beginPath();cx.moveTo(tx,hy+11);cx.lineTo(tx+1.5,hy+16);cx.lineTo(tx+3,hy+11);cx.fill();}
+    // ---- corona de calaveras ----
+    const cn=5;
+    for(let i=0;i<cn;i++){
+      const t=(i/(cn-1)-0.5), sx=bx+t*2*(R-3), sy=hy-R+2-Math.cos(t*Math.PI)*4;
+      cx.fillStyle=S('#dcd8c8');cx.beginPath();cx.arc(sx,sy,4,0,7);cx.fill();
+      cx.fillStyle=S('#b6b2a2');cx.beginPath();cx.arc(sx,sy+3,2.4,0,Math.PI);cx.fill();
+      cx.fillStyle='#201f1a';cx.beginPath();cx.arc(sx-1.4,sy-.5,1,0,7);cx.fill();cx.beginPath();cx.arc(sx+1.4,sy-.5,1,0,7);cx.fill();
+    }
+    // ---- grietas que brillan (despertando) ----
+    cx.save();cx.globalAlpha=0.85;cx.strokeStyle='#ffae30';cx.lineWidth=1.6;
+    cx.beginPath();cx.moveTo(bx-R+6,by+R-2);cx.lineTo(bx-8,by+8);cx.lineTo(bx-12,hy+18);cx.stroke();
+    cx.beginPath();cx.moveTo(bx+R-4,by+10);cx.lineTo(bx+10,by+14);cx.stroke();
+    cx.restore();
   }
   // jugador (parpadea con iframes)
   if(!(G.iframes>0&&Math.floor(G.iframes/3)%2)){
@@ -1707,7 +1742,7 @@ function render(){
   }
   if(boss&&boss.alive){
     const bg=cx.createRadialGradient(boss.x,boss.y,4,boss.x,boss.y,50);
-    bg.addColorStop(0,'rgba(232,60,40,.25)');bg.addColorStop(1,'rgba(232,60,40,0)');
+    bg.addColorStop(0,'rgba(255,150,40,.22)');bg.addColorStop(1,'rgba(255,150,40,0)');
     cx.fillStyle=bg;cx.beginPath();cx.arc(boss.x,boss.y,50,0,7);cx.fill();
   }
   cx.restore();
