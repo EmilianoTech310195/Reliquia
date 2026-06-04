@@ -502,7 +502,7 @@ const G={
   bossUnlocked:false,bossSpawned:false,
   alive:true,running:false,
   skillCD:0,skillMax:90,
-  atkTimer:0,iframes:0,
+  atkTimer:0,iframes:0,hurtT:0,
   walkFrame:0,moving:false,animT:0,
   scene:'town',            // 'town' | 'dungeon'
   baseDmg:4,baseDef:0,baseMaxhp:20,   // stats sin equipo (clases)
@@ -850,7 +850,7 @@ function spawnSlash(x,y,big){particles.push({type:'slash',x,y,life:8,maxlife:8,b
 function hurtPlayer(d){
   if(G.iframes>0)return;
   d=Math.max(1,d-G.defense);
-  G.hp-=d;G.iframes=30;
+  G.hp-=d;G.iframes=30;G.hurtT=12;
   for(let i=0;i<5;i++)particles.push({type:'spark',x:G.px,y:G.py,dx:(Math.random()-.5)*3,dy:(Math.random()-.5)*3,life:16,col:'#a02c2c'});
   if(G.hp<=0){G.hp=0;die();}
 }
@@ -936,6 +936,7 @@ function update(){
   if(G.atkTimer>0)G.atkTimer--;
   if(G.skillCD>0)G.skillCD--;
   if(G.iframes>0)G.iframes--;
+  if(G.hurtT>0)G.hurtT--;
 
   // mobs persiguen (lateral con gravedad; espectros vuelan)
   mobs.forEach(m=>{
@@ -1067,16 +1068,21 @@ function drawHero(cx0,cy0,dir,frame,moving){
   const isTank=cls.includes('tanque'), isMage=cls.includes('mago'), isAss=cls.includes('asesino');
   const step=moving?[0,2,0,-2][frame]:0;
   const back=(dir==='up');                       // de espaldas
-  const uy=cy0+(moving?(frame%2?-1:0):0);         // rebote sutil del torso al caminar (piernas fijas)
+  const air=(G.scene==='dungeon' && !G.grounded); // en el aire (saltando/cayendo)
+  const uy=cy0+((moving&&!air)?(frame%2?-1:0):0); // rebote sutil al caminar (en el suelo)
   // ---- impulso del golpe (lunge): el cuerpo se lanza hacia donde ataca ----
   const atkP=G.atkTimer>0?G.atkTimer/Math.max(1,G.atkSpeed):0; // 1 al inicio del golpe → 0
   const swing=Math.sin((1-atkP)*Math.PI);          // 0 → 1 (mitad del golpe) → 0
   const lungeX=(dir==='left'?-1:dir==='right'?1:0)*swing*3;
   const lungeY=(dir==='up'?-1:dir==='down'?1:0)*swing*2;
+  // ---- reacción de daño: retroceso hacia atrás que se desvanece ----
+  const rec=G.hurtT>0?G.hurtT/12:0;                // 1 al recibir el golpe → 0
+  const recX=(dir==='left'?1:dir==='right'?-1:0)*rec*4;
+  const recY=(dir==='up'?1:dir==='down'?-1:0)*rec*3;
   // sombra (en el suelo, no rebota ni se lanza)
   cx.fillStyle='rgba(0,25,0,.4)';
   cx.beginPath();cx.ellipse(cx0,cy0+15,11,4,0,0,7);cx.fill();
-  cx.save();cx.translate(lungeX,lungeY);          // el resto del cuerpo acompaña el golpe
+  cx.save();cx.translate(lungeX+recX,lungeY+recY); // el cuerpo acompaña golpe/retroceso
 
   // ---- mochila redondeada ----
   const packCol='#5a3e22',packHi='#7a5630',packSh='#3e2a16';
@@ -1093,12 +1099,19 @@ function drawHero(cx0,cy0,dir,frame,moving){
     cx.fillStyle='#6a4a2a';cx.beginPath();cx.arc(psx+4,uy-2,4,0,7);cx.fill();
   }
 
-  // ---- piernas con botas redondeadas (ancladas al suelo) ----
+  // ---- piernas con botas redondeadas ----
   const pant='#9a8050', pantSh='#7a6038', boot='#4a3018';
-  const lL=cy0+5+(step>0?2:0), lR=cy0+5+(step<0?2:0);
-  rr(cx0-8,lL,6,9,3,pant); rr(cx0+2,lR,6,9,3,pant);
-  rr(cx0-8,lL,2,9,1,pantSh);                       // sombra interior pierna
-  rr(cx0-9,lL+8,7,4,2,boot); rr(cx0+1,lR+8,7,4,2,boot); // botas con punta redondeada
+  if(air){ // pose de salto: recogidas al subir, extendidas hacia el suelo al caer
+    const up=G.vy<0, ly=up?cy0+2:cy0+5, sep=up?1:3, lag=up?2:0;
+    rr(cx0-7-sep,ly,6,7,3,pant); rr(cx0+1+sep,ly+lag,6,7,3,pant);
+    rr(cx0-7-sep,ly,2,7,1,pantSh);
+    rr(cx0-8-sep,ly+6,7,4,2,boot); rr(cx0+1+sep,ly+6+lag,7,4,2,boot);
+  } else { // piernas de caminata (ancladas al suelo)
+    const lL=cy0+5+(step>0?2:0), lR=cy0+5+(step<0?2:0);
+    rr(cx0-8,lL,6,9,3,pant); rr(cx0+2,lR,6,9,3,pant);
+    rr(cx0-8,lL,2,9,1,pantSh);                     // sombra interior pierna
+    rr(cx0-9,lL+8,7,4,2,boot); rr(cx0+1,lR+8,7,4,2,boot); // botas con punta redondeada
+  }
 
   // ---- torso: chaqueta de aventurero (hombros redondeados) ----
   let jacket='#6e4a28', jacketHi='#8a6038', jacketSh='#4a3018';
@@ -1172,7 +1185,10 @@ function drawHero(cx0,cy0,dir,frame,moving){
   // látigo enrollado al cinturón (lado opuesto a la mano)
   if(!back && !isTank){ const lx=dir==='left'?cx0+7:cx0-11;
     cx.strokeStyle='#3e2a16';cx.lineWidth=2;cx.beginPath();cx.arc(lx,uy+3,3,0,7);cx.stroke(); }
-  cx.restore();                                   // fin del lunge del golpe
+  // ---- flash rojo al recibir daño (sobre todo el cuerpo) ----
+  if(rec>0){ cx.fillStyle='rgba(255,55,40,'+(rec*0.55)+')';
+    cx.beginPath();cx.ellipse(cx0,uy-5,13,21,0,0,7);cx.fill(); }
+  cx.restore();                                   // fin de lunge/retroceso
 }
 
 // Monstruos: cada tipo su forma, mira a m.dir, flota/camina con m.animT
