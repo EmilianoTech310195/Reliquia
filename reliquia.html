@@ -1203,8 +1203,8 @@ function drawMob(m){
   else if(m.type==='murcielago')drawMurcielago(m,f,C);
   else if(m.type==='arana')  drawArana(m,f,C);
   else if(m.type==='guardian')drawGuardian(m,f,C);
-  if(m.hp<m.maxhp){px2(m.x-m.r,m.y-m.r-8,m.r*2,4,'#3a0808');px2(m.x-m.r,m.y-m.r-8,m.r*2*(m.hp/m.maxhp),4,'#e34');
-    px2(m.x-m.r,m.y-m.r-8,m.r*2*(m.hp/m.maxhp),1,'#f88');}
+  if(m.hp<m.maxhp){const bw=m.r*2,bx=m.x-m.r,by=m.y-m.r-8,fr=m.hp/m.maxhp;
+    rr(bx,by,bw,4,2,'#3a0808'); rr(bx,by,bw*fr,4,2,'#e34'); rr(bx,by,bw*fr,1.5,1,'#f88');}
 }
 function drawBaba(m,f,C){ // babosa de lodo, redondeada y viscosa
   const x=m.x,y=m.y,sq=f?2:0;
@@ -1212,8 +1212,10 @@ function drawBaba(m,f,C){ // babosa de lodo, redondeada y viscosa
   cx.fillStyle=C||'#5a8a2e';cx.beginPath();cx.ellipse(x,y,12,8+sq,0,0,7);cx.fill();
   cx.fillStyle=C||'#7ab03e';cx.beginPath();cx.ellipse(x-3,y-3,6,4,0,0,7);cx.fill();   // brillo
   cx.fillStyle='rgba(255,255,255,.4)';cx.beginPath();cx.ellipse(x-4,y-4,2,1.5,0,0,7);cx.fill();
-  // goteo
-  cx.fillStyle=C||'#3a5e1e';px2(x-7,y+8,4,5,C||'#3a5e1e');px2(x+4,y+9,3,4,C||'#3a5e1e');
+  // goteo viscoso (gotas redondeadas)
+  cx.fillStyle=C||'#3a5e1e';
+  cx.beginPath();cx.ellipse(x-6,y+9+sq,2.5,3.5,0,0,7);cx.fill();
+  cx.beginPath();cx.ellipse(x+5,y+10,2,3,0,0,7);cx.fill();
   // ojos
   let ex=m.dir==='left'?-4:m.dir==='right'?2:-1;
   cx.fillStyle='#fff';cx.beginPath();cx.arc(x-4+ex,y-1,3,0,7);cx.fill();cx.beginPath();cx.arc(x+4+ex,y-1,3,0,7);cx.fill();
@@ -1235,8 +1237,12 @@ function drawReptil(m,f,C){ // reptil acechante alargado
   cx.fillStyle=C||'#34602a';cx.beginPath();cx.ellipse(hx,y-1,7,5,0,0,7);cx.fill();
   cx.fillStyle='#e34';cx.beginPath();cx.arc(hx+(m.dir==='left'?-2:2),y-2,2,0,7);cx.fill();
   cx.fillStyle='#ff8';cx.beginPath();cx.arc(hx+(m.dir==='left'?-2:2),y-2,1,0,7);cx.fill();
-  // patas
-  cx.fillStyle=C||'#1e3e12';px2(x-8,y+6+leg,4,4,C||'#1e3e12');px2(x+5,y+6-leg,4,4,C||'#1e3e12');
+  // panza con luz ventral
+  cx.fillStyle=C||'#2a5020';cx.beginPath();cx.ellipse(x,y+5,9,4,0,0,7);cx.fill();
+  // patas redondeadas (alternan al caminar)
+  cx.fillStyle=C||'#1e3e12';
+  cx.beginPath();cx.ellipse(x-7,y+7+leg,3,4,0,0,7);cx.fill();
+  cx.beginPath();cx.ellipse(x+6,y+7-leg,3,4,0,0,7);cx.fill();
 }
 function drawEspectro(m,f,C){ // espectro etéreo flotante
   const x=m.x, y=m.y+Math.sin(m.animT*0.08)*3;
