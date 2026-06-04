@@ -1206,121 +1206,180 @@ function drawMob(m){
   if(m.hp<m.maxhp){const bw=m.r*2,bx=m.x-m.r,by=m.y-m.r-8,fr=m.hp/m.maxhp;
     rr(bx,by,bw,4,2,'#3a0808'); rr(bx,by,bw*fr,4,2,'#e34'); rr(bx,by,bw*fr,1.5,1,'#f88');}
 }
-function drawBaba(m,f,C){ // babosa de lodo, redondeada y viscosa
-  const x=m.x,y=m.y,sq=f?2:0;
-  cx.fillStyle=C||'#3a5e1e';cx.beginPath();cx.ellipse(x,y+2,13,9+sq,0,0,7);cx.fill(); // cuerpo base
-  cx.fillStyle=C||'#5a8a2e';cx.beginPath();cx.ellipse(x,y,12,8+sq,0,0,7);cx.fill();
-  cx.fillStyle=C||'#7ab03e';cx.beginPath();cx.ellipse(x-3,y-3,6,4,0,0,7);cx.fill();   // brillo
-  cx.fillStyle='rgba(255,255,255,.4)';cx.beginPath();cx.ellipse(x-4,y-4,2,1.5,0,0,7);cx.fill();
-  // goteo viscoso (gotas redondeadas)
-  cx.fillStyle=C||'#3a5e1e';
-  cx.beginPath();cx.ellipse(x-6,y+9+sq,2.5,3.5,0,0,7);cx.fill();
-  cx.beginPath();cx.ellipse(x+5,y+10,2,3,0,0,7);cx.fill();
-  // ojos
-  let ex=m.dir==='left'?-4:m.dir==='right'?2:-1;
+function drawBaba(m,f,C){ // baba del lodo: gelatinosa y traviesa
+  const x=m.x,y=m.y,sq=f?2:0, w=f?14:13;
+  const ex=m.dir==='left'?-3:m.dir==='right'?3:0;
+  // cuerpo gelatinoso (base oscura + cuerpo + luz)
+  cx.fillStyle=C||'#2f4d18';cx.beginPath();cx.ellipse(x,y+3,w,9+sq,0,0,7);cx.fill();
+  cx.fillStyle=C||'#4f7a26';cx.beginPath();cx.ellipse(x,y,w-1,8+sq,0,0,7);cx.fill();
+  cx.fillStyle=C||'#6fa336';cx.beginPath();cx.ellipse(x-2,y-2,w-5,6,0,0,7);cx.fill();
+  // burbujas internas
+  if(!C){cx.fillStyle='rgba(150,200,80,.5)';
+    cx.beginPath();cx.arc(x+6,y+3,2,0,7);cx.fill();
+    cx.beginPath();cx.arc(x-7,y+4,1.5,0,7);cx.fill();}
+  // brillo gel
+  cx.fillStyle='rgba(255,255,255,.5)';cx.beginPath();cx.ellipse(x-5,y-4,3,1.8,-0.4,0,7);cx.fill();
+  // gotas
+  cx.fillStyle=C||'#2f4d18';
+  cx.beginPath();cx.ellipse(x-7,y+9+sq,2.3,3.2,0,0,7);cx.fill();
+  cx.beginPath();cx.ellipse(x+6,y+10,1.8,2.6,0,0,7);cx.fill();
+  // --- cara traviesa ---
+  cx.strokeStyle='#16280a';cx.lineWidth=1.6;cx.lineCap='round'; // cejas enojadas
+  cx.beginPath();cx.moveTo(x-7+ex,y-5);cx.lineTo(x-2+ex,y-3);cx.stroke();
+  cx.beginPath();cx.moveTo(x+7+ex,y-5);cx.lineTo(x+2+ex,y-3);cx.stroke();cx.lineCap='butt';
   cx.fillStyle='#fff';cx.beginPath();cx.arc(x-4+ex,y-1,3,0,7);cx.fill();cx.beginPath();cx.arc(x+4+ex,y-1,3,0,7);cx.fill();
-  cx.fillStyle='#111';cx.beginPath();cx.arc(x-3+ex,y-1,1.5,0,7);cx.fill();cx.beginPath();cx.arc(x+5+ex,y-1,1.5,0,7);cx.fill();
+  cx.fillStyle='#111';cx.beginPath();cx.arc(x-3.5+ex,y-0.5,1.6,0,7);cx.fill();cx.beginPath();cx.arc(x+4.5+ex,y-0.5,1.6,0,7);cx.fill();
+  cx.fillStyle='#fff';cx.beginPath();cx.arc(x-4+ex,y-1.5,.6,0,7);cx.fill();cx.beginPath();cx.arc(x+4+ex,y-1.5,.6,0,7);cx.fill();
+  // boca pícara con dientito
+  cx.fillStyle='#16280a';cx.beginPath();cx.ellipse(x+ex,y+4,3.5,2,0,0,Math.PI);cx.fill();
+  cx.fillStyle='#fff';cx.beginPath();cx.moveTo(x-1+ex,y+4);cx.lineTo(x+ex,y+6);cx.lineTo(x+1.5+ex,y+4);cx.fill();
 }
-function drawReptil(m,f,C){ // reptil acechante alargado
+function drawReptil(m,f,C){ // reptil ciego: olfatea, dientes y ojos lechosos
   const x=m.x,y=m.y, leg=f?2:-2;
-  const back=m.dir==='left'?1:-1;
-  // cola
-  cx.fillStyle=C||'#244a16';cx.beginPath();cx.ellipse(x+back*12,y+2,7,4,0,0,7);cx.fill();
-  // cuerpo
-  cx.fillStyle=C||'#34602a';cx.beginPath();cx.ellipse(x,y,13,9,0,0,7);cx.fill();
-  cx.fillStyle=C||'#4a8038';cx.beginPath();cx.ellipse(x-2,y-3,9,5,0,0,7);cx.fill();
-  // crestas dorsales
-  cx.fillStyle=C||'#1e3e12';
-  for(let i=-1;i<2;i++){cx.beginPath();cx.moveTo(x+i*6,y-7);cx.lineTo(x+i*6-3,y-11);cx.lineTo(x+i*6+3,y-11);cx.fill();}
-  // cabeza
-  let hx=m.dir==='left'?x-12:x+12;
-  cx.fillStyle=C||'#34602a';cx.beginPath();cx.ellipse(hx,y-1,7,5,0,0,7);cx.fill();
-  cx.fillStyle='#e34';cx.beginPath();cx.arc(hx+(m.dir==='left'?-2:2),y-2,2,0,7);cx.fill();
-  cx.fillStyle='#ff8';cx.beginPath();cx.arc(hx+(m.dir==='left'?-2:2),y-2,1,0,7);cx.fill();
-  // panza con luz ventral
-  cx.fillStyle=C||'#2a5020';cx.beginPath();cx.ellipse(x,y+5,9,4,0,0,7);cx.fill();
-  // patas redondeadas (alternan al caminar)
-  cx.fillStyle=C||'#1e3e12';
+  const d=m.dir==='left'?-1:1, bk=-d;
+  // cola que se afina
+  cx.fillStyle=C||'#214413';cx.beginPath();cx.ellipse(x+bk*12,y+3,8,4,0,0,7);cx.fill();
+  cx.beginPath();cx.ellipse(x+bk*17,y+4,4,2.4,0,0,7);cx.fill();
+  // cuerpo + lomo + panza
+  cx.fillStyle=C||'#315a26';cx.beginPath();cx.ellipse(x,y,13,9,0,0,7);cx.fill();
+  cx.fillStyle=C||'#4a8038';cx.beginPath();cx.ellipse(x-d*2,y-3,9,5,0,0,7);cx.fill();
+  cx.fillStyle=C||'#23491a';cx.beginPath();cx.ellipse(x,y+5,10,3.5,0,0,7);cx.fill();
+  // crestas dorsales puntiagudas
+  cx.fillStyle=C||'#18340f';
+  for(let i=-1;i<2;i++){cx.beginPath();cx.moveTo(x+i*6-3,y-6);cx.lineTo(x+i*6,y-13);cx.lineTo(x+i*6+3,y-6);cx.closePath();cx.fill();}
+  // patas redondeadas
+  cx.fillStyle=C||'#18340f';
   cx.beginPath();cx.ellipse(x-7,y+7+leg,3,4,0,0,7);cx.fill();
   cx.beginPath();cx.ellipse(x+6,y+7-leg,3,4,0,0,7);cx.fill();
+  // --- cabeza ---
+  const hx=x+d*12, hy=y-1;
+  cx.fillStyle=C||'#315a26';cx.beginPath();cx.ellipse(hx,hy,8,5.5,0,0,7);cx.fill();
+  cx.fillStyle=C||'#4a8038';cx.beginPath();cx.ellipse(hx-d*1,hy-2,5,2.5,0,0,7);cx.fill();
+  cx.fillStyle=C||'#23491a';cx.beginPath();cx.ellipse(hx+d*6,hy+1,3,2.4,0,0,7);cx.fill(); // hocico
+  cx.fillStyle='#0c1f08';cx.beginPath();cx.arc(hx+d*7,hy,0.8,0,7);cx.fill();              // narina
+  // ojo lechoso (ciego) con cicatriz
+  cx.fillStyle=C||'#d8e0c0';cx.beginPath();cx.arc(hx-d*1,hy-1,2.4,0,7);cx.fill();
+  cx.strokeStyle='#5a3a2a';cx.lineWidth=1;cx.beginPath();cx.moveTo(hx-d*1-2,hy-3);cx.lineTo(hx-d*1+2,hy+1);cx.stroke();
+  // boca con dientes
+  cx.fillStyle='#0c1f08';cx.beginPath();cx.moveTo(hx+d*2,hy+3);cx.lineTo(hx+d*9,hy+3);cx.lineTo(hx+d*8,hy+5);cx.lineTo(hx+d*3,hy+5);cx.closePath();cx.fill();
+  cx.fillStyle='#fff';
+  for(let i=0;i<3;i++){const tx=hx+d*(3.5+i*2.2);cx.beginPath();cx.moveTo(tx,hy+3);cx.lineTo(tx+d*0.8,hy+5);cx.lineTo(tx+d*1.6,hy+3);cx.fill();}
+  // lengua bífida (alterna)
+  if(f){cx.strokeStyle='#c0394a';cx.lineWidth=1.2;cx.lineCap='round';
+    cx.beginPath();cx.moveTo(hx+d*8,hy+4);cx.lineTo(hx+d*13,hy+4);cx.stroke();
+    cx.beginPath();cx.moveTo(hx+d*13,hy+4);cx.lineTo(hx+d*15,hy+2.5);cx.moveTo(hx+d*13,hy+4);cx.lineTo(hx+d*15,hy+5.5);cx.stroke();cx.lineCap='butt';}
 }
-function drawEspectro(m,f,C){ // espectro etéreo flotante
+function drawEspectro(m,f,C){ // espectro pálido: alma en pena
   const x=m.x, y=m.y+Math.sin(m.animT*0.08)*3;
-  cx.save();cx.globalAlpha=0.4;
-  cx.fillStyle=C||'#7aa888';cx.beginPath();cx.ellipse(x,y+2,12,12,0,0,7);cx.fill(); // aura
-  cx.globalAlpha=0.9;
-  cx.fillStyle=C||'#bcd8c0';cx.beginPath();cx.arc(x,y-3,9,Math.PI,0);
-  cx.lineTo(x+9,y+6);cx.lineTo(x+5,y+3);cx.lineTo(x+1,y+7);cx.lineTo(x-3,y+3);cx.lineTo(x-7,y+7);cx.lineTo(x-9,y+4);cx.closePath();cx.fill(); // cuerpo ondulado
-  cx.fillStyle=C||'#e4f4e8';cx.beginPath();cx.arc(x-2,y-4,5,0,7);cx.fill();          // brillo cabeza
+  const ex=m.dir==='left'?-3:m.dir==='right'?3:0, w=Math.sin(m.animT*0.18);
+  cx.save();
+  cx.globalAlpha=0.35;cx.fillStyle=C||'#7aa888';cx.beginPath();cx.ellipse(x,y+2,13,13,0,0,7);cx.fill(); // aura
+  cx.globalAlpha=0.92;cx.fillStyle=C||'#cfe6d2';
+  cx.beginPath();cx.arc(x,y-3,9,Math.PI,0);                       // cabeza redonda
+  cx.lineTo(x+9,y+7);                                             // jirones que ondulan
+  cx.quadraticCurveTo(x+6,y+4+w, x+4,y+8-w);
+  cx.quadraticCurveTo(x+2,y+5-w, x,y+9+w);
+  cx.quadraticCurveTo(x-2,y+5+w, x-4,y+8-w);
+  cx.quadraticCurveTo(x-6,y+4-w, x-9,y+7);
+  cx.closePath();cx.fill();
+  cx.globalAlpha=0.5;cx.fillStyle=C||'#9cc2a4';cx.beginPath();cx.ellipse(x+ex*0.6,y+1,6,7,0,0,7);cx.fill(); // sombra interior
   cx.restore();
-  // ojos vacíos
-  let ex=m.dir==='left'?-3:m.dir==='right'?3:0;
-  cx.fillStyle='#16323e';cx.beginPath();cx.ellipse(x-4+ex,y-3,2,3,0,0,7);cx.fill();cx.beginPath();cx.ellipse(x+3+ex,y-3,2,3,0,0,7);cx.fill();
-  cx.fillStyle='#5fd0e0';cx.beginPath();cx.arc(x-4+ex,y-3,1,0,7);cx.fill();cx.beginPath();cx.arc(x+3+ex,y-3,1,0,7);cx.fill();
+  cx.fillStyle='rgba(255,255,255,.5)';cx.beginPath();cx.ellipse(x-3,y-6,3,2,0,0,7);cx.fill(); // brillo
+  // --- cara lamentosa ---
+  cx.fillStyle='#13303c';cx.beginPath();cx.ellipse(x-4+ex,y-3,2.4,3.4,0,0,7);cx.fill();cx.beginPath();cx.ellipse(x+4+ex,y-3,2.4,3.4,0,0,7);cx.fill();
+  cx.fillStyle='#7fe8f0';cx.beginPath();cx.arc(x-4+ex,y-3.5,1,0,7);cx.fill();cx.beginPath();cx.arc(x+4+ex,y-3.5,1,0,7);cx.fill();
+  cx.strokeStyle='#5a8a90';cx.lineWidth=1.2;cx.lineCap='round'; // cejas tristes
+  cx.beginPath();cx.moveTo(x-7+ex,y-7);cx.lineTo(x-2+ex,y-5);cx.stroke();
+  cx.beginPath();cx.moveTo(x+7+ex,y-7);cx.lineTo(x+2+ex,y-5);cx.stroke();cx.lineCap='butt';
+  cx.fillStyle='#13303c';cx.beginPath();cx.ellipse(x+ex,y+2,2,3,0,0,7);cx.fill(); // boca de gemido
 }
-function drawMurcielago(m,f,C){ // murciélago de obsidiana, alas que aletean
+function drawMurcielago(m,f,C){ // murciélago de obsidiana
   const x=m.x, y=m.y+Math.sin(m.animT*0.12)*2;
-  const wing=f?-4:4;                 // aleteo
-  const face=m.dir==='left'?-1:1;
-  // alas membranosas
-  cx.fillStyle=C||'#3a2a4e';
-  cx.beginPath();cx.moveTo(x,y);cx.lineTo(x-16,y-6+wing);cx.lineTo(x-11,y+2);cx.lineTo(x-15,y+5+wing);cx.lineTo(x-6,y+3);cx.closePath();cx.fill();
-  cx.beginPath();cx.moveTo(x,y);cx.lineTo(x+16,y-6+wing);cx.lineTo(x+11,y+2);cx.lineTo(x+15,y+5+wing);cx.lineTo(x+6,y+3);cx.closePath();cx.fill();
-  // brillo obsidiana
-  cx.fillStyle=C||'#6a4e8e';
-  cx.beginPath();cx.moveTo(x-2,y-1);cx.lineTo(x-12,y-4+wing);cx.lineTo(x-9,y+1);cx.closePath();cx.fill();
-  cx.beginPath();cx.moveTo(x+2,y-1);cx.lineTo(x+12,y-4+wing);cx.lineTo(x+9,y+1);cx.closePath();cx.fill();
-  // cuerpo
-  cx.fillStyle=C||'#241830';cx.beginPath();cx.ellipse(x,y+1,6,7,0,0,7);cx.fill();
-  cx.fillStyle=C||'#3a2a4e';cx.beginPath();cx.ellipse(x-1,y-1,4,4,0,0,7);cx.fill();
-  // orejas
+  const wing=f?-5:4, face=m.dir==='left'?-1:1;
+  // alas membranosas facetadas
+  cx.fillStyle=C||'#34243f';
+  [-1,1].forEach(s=>{cx.beginPath();cx.moveTo(x+s*2,y-1);
+    cx.lineTo(x+s*17,y-7+wing);cx.lineTo(x+s*14,y-1);cx.lineTo(x+s*17,y+4+wing);
+    cx.lineTo(x+s*11,y+1);cx.lineTo(x+s*13,y+6+wing*0.6);cx.lineTo(x+s*6,y+3);cx.closePath();cx.fill();});
+  cx.fillStyle=C||'#6a4e92'; // brillo obsidiana
+  [-1,1].forEach(s=>{cx.beginPath();cx.moveTo(x+s*3,y-1);cx.lineTo(x+s*13,y-5+wing);cx.lineTo(x+s*9,y);cx.closePath();cx.fill();});
+  // cuerpo peludo
+  cx.fillStyle=C||'#241830';cx.beginPath();cx.ellipse(x,y+1,6,7.5,0,0,7);cx.fill();
+  cx.fillStyle=C||'#3a2a4e';cx.beginPath();cx.ellipse(x-1,y-1,4.5,4.5,0,0,7);cx.fill();
+  // orejas grandes
   cx.fillStyle=C||'#241830';
-  cx.beginPath();cx.moveTo(x-4,y-5);cx.lineTo(x-6,y-11);cx.lineTo(x-1,y-6);cx.fill();
-  cx.beginPath();cx.moveTo(x+4,y-5);cx.lineTo(x+6,y-11);cx.lineTo(x+1,y-6);cx.fill();
-  // ojos rojos
-  cx.fillStyle='#e34';cx.beginPath();cx.arc(x-2+face,y-1,1.6,0,7);cx.fill();cx.beginPath();cx.arc(x+2+face,y-1,1.6,0,7);cx.fill();
-  cx.fillStyle='#ff8';cx.beginPath();cx.arc(x-2+face,y-1,.7,0,7);cx.fill();cx.beginPath();cx.arc(x+2+face,y-1,.7,0,7);cx.fill();
+  cx.beginPath();cx.moveTo(x-5,y-5);cx.lineTo(x-7,y-13);cx.lineTo(x-1,y-7);cx.closePath();cx.fill();
+  cx.beginPath();cx.moveTo(x+5,y-5);cx.lineTo(x+7,y-13);cx.lineTo(x+1,y-7);cx.closePath();cx.fill();
+  cx.fillStyle=C||'#4a3560';
+  cx.beginPath();cx.moveTo(x-5,y-6);cx.lineTo(x-6,y-11);cx.lineTo(x-3,y-7);cx.closePath();cx.fill();
+  cx.beginPath();cx.moveTo(x+5,y-6);cx.lineTo(x+6,y-11);cx.lineTo(x+3,y-7);cx.closePath();cx.fill();
+  // ojos rojos enojados (cejas)
+  cx.strokeStyle='#160a1e';cx.lineWidth=1.4;cx.lineCap='round';
+  cx.beginPath();cx.moveTo(x-5,y-3);cx.lineTo(x-1,y-2);cx.stroke();
+  cx.beginPath();cx.moveTo(x+5,y-3);cx.lineTo(x+1,y-2);cx.stroke();cx.lineCap='butt';
+  cx.fillStyle='#ff3a4a';cx.beginPath();cx.arc(x-2+face,y-1,1.5,0,7);cx.fill();cx.beginPath();cx.arc(x+2+face,y-1,1.5,0,7);cx.fill();
+  cx.fillStyle='#ffd0a0';cx.beginPath();cx.arc(x-2+face,y-1.4,.5,0,7);cx.fill();cx.beginPath();cx.arc(x+2+face,y-1.4,.5,0,7);cx.fill();
+  // colmillos
+  cx.fillStyle='#fff';
+  cx.beginPath();cx.moveTo(x-2,y+3);cx.lineTo(x-1,y+6);cx.lineTo(x,y+3);cx.fill();
+  cx.beginPath();cx.moveTo(x+2,y+3);cx.lineTo(x+1,y+6);cx.lineTo(x,y+3);cx.fill();
 }
-function drawArana(m,f,C){ // araña de las sombras, patas que se mueven
-  const x=m.x,y=m.y,lg=f?2:-2;
-  const face=m.dir==='left'?-1:1;
-  // patas (4 por lado), articuladas
-  cx.strokeStyle=C||'#140e1e';cx.lineWidth=2;cx.lineCap='round';
-  for(let i=0;i<4;i++){
-    const oy=y-4+i*4, sp=(i%2?lg:-lg);
-    cx.beginPath();cx.moveTo(x-5,oy);cx.lineTo(x-12,oy-3+sp);cx.lineTo(x-15,oy+4);cx.stroke();
-    cx.beginPath();cx.moveTo(x+5,oy);cx.lineTo(x+12,oy-3-sp);cx.lineTo(x+15,oy+4);cx.stroke();
-  }
+function drawArana(m,f,C){ // araña de las sombras
+  const x=m.x,y=m.y,lg=f?2:-2, face=m.dir==='left'?-1:1;
+  // patas articuladas con rodilla (4 por lado)
+  cx.strokeStyle=C||'#120c1c';cx.lineWidth=2;cx.lineCap='round';
+  for(let i=0;i<4;i++){const oy=y-3+i*3.5, sp=(i%2?lg:-lg), reach=12+i;
+    [-1,1].forEach(s=>{cx.beginPath();cx.moveTo(x+s*5,oy);
+      cx.lineTo(x+s*(reach-2),oy-5+sp);cx.lineTo(x+s*reach,oy+5);cx.stroke();});}
   cx.lineCap='butt';
-  // abdomen
-  cx.fillStyle=C||'#1e1430';cx.beginPath();cx.ellipse(x,y+3,10,9,0,0,7);cx.fill();
-  cx.fillStyle=C||'#3a2a52';cx.beginPath();cx.ellipse(x-2,y+1,6,5,0,0,7);cx.fill();
-  // marca de reloj de arena en el lomo
-  cx.fillStyle=C||'#7a2a3a';cx.beginPath();cx.moveTo(x,y-2);cx.lineTo(x-4,y+5);cx.lineTo(x,y+3);cx.lineTo(x+4,y+5);cx.closePath();cx.fill();
-  // cefalotórax (cabeza)
-  cx.fillStyle=C||'#241836';cx.beginPath();cx.ellipse(x+face*4,y-5,6,5,0,0,7);cx.fill();
-  // ojos múltiples rojos
-  cx.fillStyle='#e34';
-  cx.beginPath();cx.arc(x+face*4-3,y-6,1.4,0,7);cx.fill();
-  cx.beginPath();cx.arc(x+face*4+3,y-6,1.4,0,7);cx.fill();
-  cx.beginPath();cx.arc(x+face*4-1,y-4,1,0,7);cx.fill();
-  cx.beginPath();cx.arc(x+face*4+1,y-4,1,0,7);cx.fill();
-  cx.fillStyle='#ff8';cx.beginPath();cx.arc(x+face*4-3,y-6,.6,0,7);cx.fill();cx.beginPath();cx.arc(x+face*4+3,y-6,.6,0,7);cx.fill();
+  // abdomen brilloso
+  cx.fillStyle=C||'#1c1230';cx.beginPath();cx.ellipse(x,y+3,10,9,0,0,7);cx.fill();
+  cx.fillStyle=C||'#34234e';cx.beginPath();cx.ellipse(x-2,y+1,6,5,0,0,7);cx.fill();
+  cx.fillStyle='rgba(180,150,220,.35)';cx.beginPath();cx.ellipse(x-3,y-1,2.5,1.8,0,0,7);cx.fill();
+  // reloj de arena rojo
+  cx.fillStyle=C||'#b02a3a';
+  cx.beginPath();cx.moveTo(x-3,y);cx.lineTo(x+3,y);cx.lineTo(x,y+3);cx.closePath();cx.fill();
+  cx.beginPath();cx.moveTo(x-3,y+6);cx.lineTo(x+3,y+6);cx.lineTo(x,y+3);cx.closePath();cx.fill();
+  // cefalotórax + colmillos
+  cx.fillStyle=C||'#241636';cx.beginPath();cx.ellipse(x+face*5,y-5,6,5,0,0,7);cx.fill();
+  cx.fillStyle='#fff';cx.beginPath();cx.moveTo(x+face*8,y-3);cx.lineTo(x+face*10,y+1);cx.lineTo(x+face*7,y-1);cx.fill();
+  // 6 ojos rojos
+  cx.fillStyle='#ff3a4a';
+  cx.beginPath();cx.arc(x+face*4,y-7,1.6,0,7);cx.fill();
+  cx.beginPath();cx.arc(x+face*7,y-6,1.4,0,7);cx.fill();
+  [[3,-5],[6,-4],[5,-3],[8,-4]].forEach(([dx,dy])=>{cx.beginPath();cx.arc(x+face*dx,y+dy,0.8,0,7);cx.fill();});
+  cx.fillStyle='#ffd0a0';cx.beginPath();cx.arc(x+face*4,y-7.4,.6,0,7);cx.fill();cx.beginPath();cx.arc(x+face*7,y-6.4,.5,0,7);cx.fill();
 }
-function drawGuardian(m,f,C){ // guardián de piedra agrietado
+function drawGuardian(m,f,C){ // guardián roto: ídolo de piedra azteca
   const x=m.x,y=m.y,R=m.r;
-  px2(x-R,y-R,R*2,R*2,C||'#6e6e60');                  // bloque
-  px2(x-R,y-R,R*2,5,C||'#9a9a8a');                    // luz arriba
-  px2(x-R,y-R,5,R*2,C||'#86867a');                    // luz izq
-  px2(x-R,y+R-6,R*2,6,C||'#4a4a40');                  // sombra abajo
-  px2(x+R-5,y-R,5,R*2,C||'#52524a');                  // sombra der
-  // grietas con runa brillante
-  cx.strokeStyle=C||'#e8a020';cx.lineWidth=2;
-  cx.beginPath();cx.moveTo(x-6,y-8);cx.lineTo(x-4,y);cx.lineTo(x-8,y+6);cx.stroke();
-  cx.beginPath();cx.moveTo(x+5,y-7);cx.lineTo(x+3,y-1);cx.lineTo(x+7,y+5);cx.stroke();
-  // ojos-runa
-  cx.fillStyle='#ffb830';px2(x-7,y-6,5,3,'#ffb830');px2(x+3,y-6,5,3,'#ffb830');
-  cx.fillStyle='#fff0a0';px2(x-6,y-6,2,2,'#fff0a0');px2(x+4,y-6,2,2,'#fff0a0');
+  // bloque pétreo con caras de luz/sombra
+  rr(x-R,y-R,R*2,R*2,4,C||'#6e6e60');
+  rr(x-R,y-R,R*2,5,3,C||'#9a9a8a');
+  rr(x-R,y-R,5,R*2,3,C||'#86867a');
+  rr(x-R,y+R-6,R*2,6,3,C||'#4a4a40');
+  rr(x+R-5,y-R,5,R*2,3,C||'#52524a');
+  if(!C){cx.fillStyle='rgba(0,0,0,.12)';cx.beginPath();cx.arc(x-6,y+4,1.5,0,7);cx.fill();cx.beginPath();cx.arc(x+8,y+8,1.2,0,7);cx.fill();}
+  // tocado: banda con escalones aztecas
+  rr(x-R+3,y-R+3,R*2-6,5,2,C||'#5a5a50');
+  cx.fillStyle=C||'#7a7a6c';for(let i=-2;i<=2;i++){px2(x+i*5-1,y-R+4,3,2,C||'#7a7a6c');}
+  // ceño hundido (enojado)
+  cx.strokeStyle=C||'#3e3e36';cx.lineWidth=2;
+  cx.beginPath();cx.moveTo(x-8,y-3);cx.lineTo(x-3,y-5);cx.moveTo(x+8,y-3);cx.lineTo(x+3,y-5);cx.stroke();
+  // ojos-runa hundidos que laten
+  cx.fillStyle=C||'#3a3a32';cx.beginPath();cx.ellipse(x-6,y-1,3.5,3,0,0,7);cx.fill();cx.beginPath();cx.ellipse(x+6,y-1,3.5,3,0,0,7);cx.fill();
+  const glow=0.6+Math.sin(m.animT*0.12)*0.4;
+  cx.save();cx.globalAlpha=glow;cx.fillStyle='#ffb830';
+  cx.beginPath();cx.arc(x-6,y-1,2,0,7);cx.fill();cx.beginPath();cx.arc(x+6,y-1,2,0,7);cx.fill();cx.restore();
+  cx.fillStyle='#fff0a0';cx.beginPath();cx.arc(x-6,y-1.5,.8,0,7);cx.fill();cx.beginPath();cx.arc(x+6,y-1.5,.8,0,7);cx.fill();
+  // nariz angular
+  cx.fillStyle=C||'#52524a';cx.beginPath();cx.moveTo(x,y-2);cx.lineTo(x-2,y+4);cx.lineTo(x+2,y+4);cx.closePath();cx.fill();
+  // boca/dientes de ídolo
+  rr(x-7,y+6,14,4,1,C||'#2e2e28');
+  cx.fillStyle=C||'#c8c8b8';for(let i=0;i<4;i++){px2(x-6+i*4,y+6,2,4,C||'#c8c8b8');}
+  // grietas brillantes (está roto)
+  cx.save();cx.globalAlpha=0.8;cx.strokeStyle='#e8a020';cx.lineWidth=1.4;
+  cx.beginPath();cx.moveTo(x-R+2,y-4);cx.lineTo(x-10,y+2);cx.lineTo(x-12,y+10);cx.stroke();
+  cx.beginPath();cx.moveTo(x+R-2,y+6);cx.lineTo(x+11,y+2);cx.stroke();cx.restore();
 }
 
 let waterFrame=0;
