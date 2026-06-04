@@ -1478,64 +1478,67 @@ function isRock(x,y){
   return walls[y][x]===20;
 }
 function drawCaveAir(px,py,x,y){
-  // fondo de caverna con profundidad: degradado oscuro + niebla baja
-  vGrad(px,py,TILE,TILE,'#2a2030','#181020');
-  // capa de "lejanía": rocas de fondo difusas (parallax estático)
+  // fondo de caverna con profundidad (degradado oscuro, tono cálido morado)
+  vGrad(px,py,TILE,TILE,'#241b2c','#15101e');
   const r=cellRnd(x,y,3);
-  if(r>.6){
-    cx.fillStyle='rgba(70,55,80,.22)';
-    cx.beginPath();
-    cx.moveTo(px+ (r*20|0), py+TILE);
-    cx.lineTo(px+ (r*14|0)+4, py+10+(r*8|0));
-    cx.lineTo(px+ (r*24|0), py+6);
-    cx.lineTo(px+TILE-(r*10|0), py+12);
-    cx.lineTo(px+TILE, py+TILE);
+  // rocas lejanas difusas: siluetas suaves y redondeadas (menos frecuentes)
+  if(r>.72){
+    cx.fillStyle='rgba(58,46,70,.28)';
+    cx.beginPath();cx.moveTo(px-2,py+TILE);
+    cx.quadraticCurveTo(px+TILE*0.3, py+8+(r*10|0), px+TILE*0.5, py+14);
+    cx.quadraticCurveTo(px+TILE*0.7, py+6+(cellRnd(x,y,5)*10|0), px+TILE+2, py+TILE);
     cx.closePath();cx.fill();
   }
-  // motas de polvo/minerales que brillan tenue
-  if(cellRnd(x,y,9)>.8){cx.fillStyle='rgba(150,120,170,.14)';cx.fillRect(px+(r*22|0),py+(r*22|0),2,2);}
-  // estalactita colgando si arriba hay roca y aquí aire
+  // motas de mineral que brillan tenue
+  if(cellRnd(x,y,9)>.82){cx.fillStyle='rgba(170,140,200,.16)';cx.beginPath();cx.arc(px+(r*22|0),py+(r*22|0),1.3,0,7);cx.fill();}
+  // estalactita colgando si arriba hay roca
   if(isRock(x,y-1) && !isRock(x,y)){
-    const sx=px+8+(cellRnd(x,y,4)*14|0);
-    const len=6+(cellRnd(x,y,6)*10|0);
-    cx.fillStyle='#3a3040';
+    const sx=px+8+(cellRnd(x,y,4)*14|0), len=6+(cellRnd(x,y,6)*10|0);
+    cx.fillStyle='#352b42';
     cx.beginPath();cx.moveTo(sx,py);cx.lineTo(sx+5,py);cx.lineTo(sx+2,py+len);cx.closePath();cx.fill();
-    cx.fillStyle='rgba(255,255,255,.06)';
+    cx.fillStyle='rgba(255,210,150,.10)'; // recibe luz cálida de antorchas
     cx.beginPath();cx.moveTo(sx,py);cx.lineTo(sx+2,py);cx.lineTo(sx+1,py+len*0.6);cx.closePath();cx.fill();
   }
   // estalagmita subiendo si abajo hay roca
   if(isRock(x,y+1) && !isRock(x,y)){
-    const sx=px+6+(cellRnd(x,y,7)*16|0);
-    const len=5+(cellRnd(x,y,8)*8|0);
-    cx.fillStyle='#332b3c';
+    const sx=px+6+(cellRnd(x,y,7)*16|0), len=5+(cellRnd(x,y,8)*8|0);
+    cx.fillStyle='#2e2638';
     cx.beginPath();cx.moveTo(sx,py+TILE);cx.lineTo(sx+5,py+TILE);cx.lineTo(sx+2,py+TILE-len);cx.closePath();cx.fill();
   }
 }
 function drawCaveRock(px,py,x,y){
   const top=!isRock(x,y-1), bot=!isRock(x,y+1), lft=!isRock(x-1,y), rgt=!isRock(x+1,y);
-  // cuerpo de roca con degradado (más clara arriba)
-  vGrad(px,py,TILE,TILE,'#5e5048','#352d2a');
-  // textura de roca: manchas irregulares de distintos tonos
+  // cuerpo de piedra labrada (cálida, más clara arriba)
+  vGrad(px,py,TILE,TILE,'#62534a','#352b27');
   const r=cellRnd(x,y,5), r2=cellRnd(x,y,11);
-  cx.fillStyle='rgba(255,235,210,.06)';
-  cx.beginPath();cx.arc(px+8+(r*16|0),py+8+(r2*16|0),5,0,7);cx.fill();
-  cx.fillStyle='rgba(0,0,0,.18)';
-  cx.beginPath();cx.arc(px+20-(r*12|0),py+18+(r2*8|0),4,0,7);cx.fill();
-  // vetas minerales (líneas diagonales tenues)
-  cx.strokeStyle='rgba(120,100,140,.16)';cx.lineWidth=1;
-  cx.beginPath();cx.moveTo(px+(r*TILE|0),py);cx.lineTo(px+(r2*TILE|0),py+TILE);cx.stroke();
-  // BORDES ORGÁNICOS: solo donde linda con aire, con relieve irregular
+  // facetas talladas (planos suaves en vez de manchas circulares)
+  cx.fillStyle='rgba(255,238,210,.05)';
+  cx.beginPath();cx.moveTo(px,py+6);cx.lineTo(px+TILE,py+2);cx.lineTo(px+TILE,py+10);cx.lineTo(px,py+14);cx.closePath();cx.fill();
+  cx.fillStyle='rgba(0,0,0,.12)';
+  cx.beginPath();cx.moveTo(px,py+TILE-8);cx.lineTo(px+TILE,py+TILE-12);cx.lineTo(px+TILE,py+TILE);cx.lineTo(px,py+TILE);cx.closePath();cx.fill();
+  // grano de piedra sutil (determinista)
+  cx.fillStyle='rgba(0,0,0,.10)';cx.fillRect(px+4+(r*18|0),py+10+(r2*8|0),3,2);
+  cx.fillStyle='rgba(255,230,200,.06)';cx.fillRect(px+14-(r2*10|0),py+18,2,2);
+  // juntas de mampostería: bloques de templo (solo piedra interior)
+  cx.strokeStyle='rgba(0,0,0,.22)';cx.lineWidth=1;
+  if(!top){cx.beginPath();cx.moveTo(px,py+0.5);cx.lineTo(px+TILE,py+0.5);cx.stroke();}
+  if(!lft){cx.beginPath();cx.moveTo(px+0.5,py);cx.lineTo(px+0.5,py+TILE);cx.stroke();}
+  // glifo azteca tallado, ocasional (greca escalonada)
+  if(!top&&!bot&&!lft&&!rgt && cellRnd(x,y,13)>.86){
+    cx.strokeStyle='rgba(255,200,120,.18)';cx.lineWidth=1.4;
+    cx.beginPath();cx.moveTo(px+9,py+21);cx.lineTo(px+9,py+11);cx.lineTo(px+20,py+11);cx.lineTo(px+20,py+17);cx.lineTo(px+15,py+17);cx.stroke();
+  }
+  // ---- BORDES expuestos al aire (relieve + luz cálida de antorchas) ----
   if(top){
-    // borde superior dentado con luz (la roca recibe luz de antorchas arriba)
-    cx.fillStyle='#7a6a5e';
+    cx.fillStyle='#80705f';
     cx.beginPath();cx.moveTo(px,py+3);
     for(let i=0;i<=TILE;i+=8){cx.lineTo(px+i,py+(cellRnd(x*9+i,y,2)*4|0));}
     cx.lineTo(px+TILE,py+3);cx.lineTo(px+TILE,py);cx.lineTo(px,py);cx.closePath();cx.fill();
-    cx.fillStyle='rgba(255,220,180,.18)';cx.fillRect(px,py,TILE,2);
+    cx.fillStyle='rgba(255,210,150,.22)';cx.fillRect(px,py,TILE,2);
   }
-  if(bot){cx.fillStyle='rgba(0,0,0,.35)';cx.fillRect(px,py+TILE-4,TILE,4);}
-  if(lft){cx.fillStyle='rgba(0,0,0,.18)';cx.fillRect(px,py,3,TILE);}
-  if(rgt){cx.fillStyle='rgba(0,0,0,.22)';cx.fillRect(px+TILE-3,py,3,TILE);}
+  if(bot){cx.fillStyle='rgba(0,0,0,.38)';cx.fillRect(px,py+TILE-4,TILE,4);}
+  if(lft){cx.fillStyle='rgba(0,0,0,.20)';cx.fillRect(px,py,3,TILE);}
+  if(rgt){cx.fillStyle='rgba(0,0,0,.24)';cx.fillRect(px+TILE-3,py,3,TILE);}
 }
 function drawTorch(px,py,x,y){
   const fl=Math.sin(waterFrame*0.2+x)*2;
