@@ -1400,14 +1400,17 @@ function vGrad(px,py,w,h,c1,c2){
   cx.fillStyle=g;cx.fillRect(px,py,w,h);
 }
 function drawGrass(px,py,x,y){
-  vGrad(px,py,TILE,TILE,'#5fb04a','#3d8a30');           // hierba con luz arriba
-  // matas de pasto con sombra y brillo
-  const r=cellRnd(x,y,1), r2=cellRnd(x,y,2);
-  cx.fillStyle='#2f7a26';
-  cx.fillRect(px+4+(r*16|0),py+20,3,6); cx.fillRect(px+18-(r2*8|0),py+10,3,6);
-  cx.fillStyle='#74c75a';
-  cx.fillRect(px+4+(r*16|0),py+19,2,3); cx.fillRect(px+18-(r2*8|0),py+9,2,3);
-  if(r>.55){cx.fillStyle='#8ad872';cx.fillRect(px+10,py+24,5,2);}
+  const t=cellRnd(x,y,1), r=cellRnd(x,y,2), r2=cellRnd(x,y,4);
+  // variación de tono por celda (evita el verde plano uniforme)
+  vGrad(px,py,TILE,TILE, t>.5?'#62b34d':'#57a843', t>.5?'#3f8d31':'#37822c');
+  if(t>.7){cx.fillStyle='rgba(255,255,255,.05)';cx.beginPath();cx.ellipse(px+16,py+16,14,12,0,0,7);cx.fill();}
+  else if(t<.25){cx.fillStyle='rgba(0,40,0,.10)';cx.beginPath();cx.ellipse(px+14,py+18,13,11,0,0,7);cx.fill();}
+  // briznas de pasto (líneas) con sombra y luz
+  const gx=px+5+(r*18|0), gy=py+23, gx2=px+18-(r2*8|0), gy2=py+13;
+  cx.strokeStyle='#2f7a26';cx.lineWidth=1.5;cx.lineCap='round';
+  cx.beginPath();cx.moveTo(gx,gy);cx.lineTo(gx-1,gy-6);cx.moveTo(gx+2,gy);cx.lineTo(gx+3,gy-5);
+  cx.moveTo(gx2,gy2);cx.lineTo(gx2-1,gy2-5);cx.moveTo(gx2+2,gy2);cx.lineTo(gx2+3,gy2-4);cx.stroke();
+  cx.strokeStyle='#80d566';cx.beginPath();cx.moveTo(gx,gy);cx.lineTo(gx-1,gy-4);cx.stroke();cx.lineCap='butt';
 }
 function drawFlowers(px,py,x,y){
   drawGrass(px,py,x,y);
@@ -1558,16 +1561,21 @@ function drawTorch(px,py,x,y){
   cx.fillStyle='#fff7d0';cx.beginPath();cx.arc(px+16,py+11+fl2,1.4,0,7);cx.fill();
 }
 function drawBuilding(px,py,x,y){
-  vGrad(px,py,TILE,TILE,'#b89a6a','#8a6e44');   // muro de adobe
-  cx.fillStyle='rgba(0,0,0,.15)';
-  for(let i=0;i<TILE;i+=8)cx.fillRect(px,py+i,TILE,1);  // hiladas
-  cx.fillStyle='rgba(255,255,255,.1)';cx.fillRect(px,py,TILE,3);
+  vGrad(px,py,TILE,TILE,'#c2a06e','#92704a');   // muro de adobe cálido
+  // hiladas con junta de ladrillo alternado
+  cx.fillStyle='rgba(0,0,0,.14)';
+  for(let i=8;i<TILE;i+=8)cx.fillRect(px,py+i,TILE,1.5);
+  cx.fillStyle='rgba(0,0,0,.10)';
+  for(let i=0;i<TILE;i+=16){cx.fillRect(px+TILE/4,py+i,1.5,8);cx.fillRect(px+3*TILE/4,py+i+8,1.5,8);}
+  cx.fillStyle='rgba(255,240,210,.12)';cx.fillRect(px,py,TILE,3); // luz arriba
 }
 function drawRoof(px,py,x,y){
-  vGrad(px,py,TILE,TILE,'#a85a3a','#7a3a22');   // teja roja
-  cx.fillStyle='#8a4a30';
-  for(let i=0;i<TILE;i+=7)cx.fillRect(px+i,py,2,TILE);
-  cx.fillStyle='rgba(255,200,150,.25)';cx.fillRect(px,py,TILE,3);
+  vGrad(px,py,TILE,TILE,'#b85a38','#8a3a22');   // teja de barro
+  // hileras de tejas curvas (medias lunas que solapan)
+  cx.fillStyle='#9a4628';
+  for(let ry=3;ry<=TILE;ry+=7)for(let rx=0;rx<TILE;rx+=9){cx.beginPath();cx.arc(px+rx+4,py+ry,4.5,0,Math.PI);cx.fill();}
+  cx.fillStyle='rgba(255,205,155,.30)';cx.fillRect(px,py,TILE,3);       // luz cumbrera
+  cx.fillStyle='rgba(0,0,0,.20)';cx.fillRect(px,py+TILE-3,TILE,3);      // alero en sombra
 }
 function drawDoor(px,py,x,y){
   drawStone(px,py,x,y);
@@ -1601,17 +1609,42 @@ function drawCave(px,py,x,y){
 }
 function drawNPC(px,py,x,y){
   drawGrass(px,py,x,y);
-  const cx0=px+16,cy0=py+18;
-  cx.fillStyle='rgba(0,25,0,.35)';cx.beginPath();cx.ellipse(cx0,cy0+10,8,3,0,0,7);cx.fill();
-  // túnica de aldeano
-  px2(cx0-7,cy0-4,14,14,'#6a5a8a');px2(cx0-7,cy0-4,14,3,'#8a7aaa');
-  // cabeza
-  px2(cx0-5,cy0-15,10,11,'#e8b890');px2(cx0-5,cy0-15,10,3,'#f4c8a0');
-  px2(cx0-5,cy0-16,10,3,'#cccccc'); // pelo cano
-  px2(cx0-3,cy0-10,2,2,'#222');px2(cx0+1,cy0-10,2,2,'#222');
+  const cx0=px+16, cy0=py+18;
+  const elder=(x<8);                       // Anciano a la izquierda, Mercader a la derecha
+  const by=cy0+Math.sin(waterFrame*0.06+x)*0.6; // respira/se mece
+  cx.fillStyle='rgba(0,25,0,.35)';cx.beginPath();cx.ellipse(cx0,cy0+11,8,3,0,0,7);cx.fill();
+  if(elder){
+    // --- Anciano de Tenoch: túnica, bastón con gema, barba blanca ---
+    cx.strokeStyle='#6a4a2a';cx.lineWidth=2;cx.lineCap='round';
+    cx.beginPath();cx.moveTo(cx0+8,by-14);cx.lineTo(cx0+8,by+10);cx.stroke();cx.lineCap='butt';
+    cx.fillStyle='#7fe0c0';cx.beginPath();cx.arc(cx0+8,by-15,2.5,0,7);cx.fill();
+    cx.fillStyle='#9a8a6a';                 // túnica (campana)
+    cx.beginPath();cx.moveTo(cx0-7,by-3);cx.quadraticCurveTo(cx0-9,by+10,cx0-7,by+11);cx.lineTo(cx0+7,by+11);cx.quadraticCurveTo(cx0+9,by+10,cx0+7,by-3);cx.closePath();cx.fill();
+    cx.fillStyle='#b6a888';cx.beginPath();cx.ellipse(cx0,by-2,7,4,0,0,7);cx.fill();
+    cx.fillStyle='#e0a878';cx.beginPath();cx.arc(cx0,by-9,5.5,0,7);cx.fill(); // cabeza
+    cx.fillStyle='#a04030';cx.beginPath();cx.ellipse(cx0,by-12,6,3,0,0,7);cx.fill(); // cinta
+    cx.fillStyle='#e8c547';cx.fillRect(cx0-5,by-13,10,1.5);
+    cx.fillStyle='#e8e8e0';                 // barba
+    cx.beginPath();cx.moveTo(cx0-4,by-7);cx.quadraticCurveTo(cx0,by+1,cx0+4,by-7);cx.quadraticCurveTo(cx0,by-4,cx0-4,by-7);cx.fill();
+    cx.fillStyle='#222';cx.beginPath();cx.arc(cx0-2,by-9,1,0,7);cx.fill();cx.beginPath();cx.arc(cx0+2,by-9,1,0,7);cx.fill();
+  } else {
+    // --- Mercader: poncho azteca, fardo a la espalda, tocado de plumas ---
+    cx.fillStyle='#7a5630';cx.beginPath();cx.ellipse(cx0-7,by-1,4,5,0,0,7);cx.fill(); // fardo
+    cx.fillStyle='#2a8a8a';                 // poncho
+    cx.beginPath();cx.moveTo(cx0-7,by-3);cx.quadraticCurveTo(cx0-8,by+10,cx0-6,by+11);cx.lineTo(cx0+6,by+11);cx.quadraticCurveTo(cx0+8,by+10,cx0+7,by-3);cx.closePath();cx.fill();
+    cx.fillStyle='#3aaaaa';cx.beginPath();cx.ellipse(cx0,by-2,7,4,0,0,7);cx.fill();
+    cx.fillStyle='#e8c547';cx.fillRect(cx0-6,by+3,12,1.5); // patrón
+    cx.fillStyle='#e86a4a';for(let i=-1;i<2;i++)cx.fillRect(cx0-1+i*4,by+5,2,2);
+    cx.fillStyle='#d89858';cx.beginPath();cx.arc(cx0,by-9,5.5,0,7);cx.fill(); // cabeza
+    cx.fillStyle='#1f8a4a';cx.beginPath();cx.moveTo(cx0-3,by-13);cx.lineTo(cx0-3,by-19);cx.lineTo(cx0,by-14);cx.fill(); // plumas
+    cx.fillStyle='#e8c547';cx.beginPath();cx.moveTo(cx0+1,by-13);cx.lineTo(cx0+2,by-18);cx.lineTo(cx0+4,by-13);cx.fill();
+    cx.fillStyle='#a04030';cx.fillRect(cx0-5,by-12,10,2); // banda
+    cx.fillStyle='#222';cx.beginPath();cx.arc(cx0-2,by-9,1,0,7);cx.fill();cx.beginPath();cx.arc(cx0+2,by-9,1,0,7);cx.fill();
+    cx.strokeStyle='#7a3a2a';cx.lineWidth=1;cx.beginPath();cx.arc(cx0,by-7,2,0.15*Math.PI,0.85*Math.PI);cx.stroke(); // sonrisa
+  }
   // signo de interacción flotante
   const b=Math.sin(waterFrame*0.12)*2;
-  cx.fillStyle='#f0d24a';cx.font='bold 14px monospace';cx.fillText('!',cx0-3,cy0-20+b);
+  cx.fillStyle='#f0d24a';cx.font='bold 13px monospace';cx.fillText('!',cx0-3,by-21+b);
 }
 
 // ruido determinista por celda (para texturas estables, no titilantes)
