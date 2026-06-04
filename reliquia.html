@@ -808,6 +808,7 @@ function hitArea(hx,hy,rad,dmg){
   mobs.forEach(m=>{
     if(Math.hypot(m.x-hx,m.y-hy)<rad+m.r){
       m.hp-=dmg;m.hit=8;
+      m.kbx=(m.x>=hx?1:-1)*6; if(!m.flying)m.vy=-2.5; // empuje + saltito
       for(let i=0;i<4;i++)particles.push({type:'spark',x:m.x,y:m.y,dx:(Math.random()-.5)*2,dy:(Math.random()-.5)*2,life:14,col:m.col});
       if(m.hp<=0)killMob(m);
       else if(G.lifesteal){G.hp=Math.min(G.maxhp,G.hp+G.lifesteal*.4);}
@@ -815,6 +816,7 @@ function hitArea(hx,hy,rad,dmg){
   });
   if(boss&&boss.alive&&Math.hypot(boss.x-hx,boss.y-hy)<rad+boss.r){
     boss.hp-=dmg;boss.hit=8;
+    boss.kbx=(boss.x>=hx?1:-1)*2; // el coloso apenas se tambalea
     for(let i=0;i<6;i++)particles.push({type:'spark',x:boss.x,y:boss.y,dx:(Math.random()-.5)*3,dy:(Math.random()-.5)*3,life:18,col:'#e8c547'});
     if(boss.hp<=0)winGame();
   }
@@ -946,11 +948,13 @@ function update(){
     const dx=G.px-m.x, dy=G.py-m.y;
     const d=Math.hypot(dx,dy);
     const flying=m.flying;
-    if(d<140&&Math.abs(dx)>2){
+    if(d<140&&Math.abs(dx)>2&&!m.kbx){
       m.dir = dx>0?'right':'left';
       const step=(dx>0?1:-1)*m.sp;
       if(!solidSide(m.x+step, m.y)) m.x+=step;
     }
+    // empuje por golpe (knockback) que se frena
+    if(m.kbx){ if(!solidSide(m.x+m.kbx, m.y)) m.x+=m.kbx; m.kbx*=0.8; if(Math.abs(m.kbx)<0.3)m.kbx=0; }
     if(flying){
       // flota hacia la altura del jugador
       if(Math.abs(dy)>2 && d<140) m.y += (dy>0?1:-1)*m.sp*0.6;
@@ -990,9 +994,11 @@ function update(){
     const CW=45;
     boss.charge = boss.atkT<CW ? 1-(boss.atkT/CW) : 0;
     // perseguir horizontalmente (se planta mientras junta fuerza)
-    if(Math.abs(dx)>4){ boss.dir=dx>0?'right':'left';
+    if(Math.abs(dx)>4&&!boss.kbx){ boss.dir=dx>0?'right':'left';
       const step=(dx>0?1:-1)*boss.sp*(boss.charge>0?0.15:1);
       if(!solidSide(boss.x+step, boss.y)) boss.x+=step; }
+    // tambaleo por golpe (knockback leve, se frena)
+    if(boss.kbx){ if(!solidSide(boss.x+boss.kbx, boss.y)) boss.x+=boss.kbx; boss.kbx*=0.8; if(Math.abs(boss.kbx)<0.3)boss.kbx=0; }
     // gravedad del boss
     boss.vy+=G.gravity; if(boss.vy>12)boss.vy=12;
     if(!solidSide(boss.x, boss.y+boss.vy+boss.r)){ boss.y+=boss.vy; }
@@ -1014,8 +1020,8 @@ function update(){
       if(G.scene==='dungeon'?solidSide(p.x,p.y):solid(p.x,p.y))p.life=0;
       if(p.type==='bolt'){
         mobs.forEach(m=>{if(!p.hits.has(m)&&Math.hypot(m.x-p.x,m.y-p.y)<m.r+6){
-          m.hp-=p.dmg;m.hit=8;p.hits.add(m);if(m.hp<=0)killMob(m);}});
-        if(boss&&boss.alive&&Math.hypot(boss.x-p.x,boss.y-p.y)<boss.r+6){boss.hp-=p.dmg;boss.hit=8;if(boss.hp<=0)winGame();}
+          m.hp-=p.dmg;m.hit=8;p.hits.add(m);m.kbx=(m.x>=p.x?1:-1)*7;if(!m.flying)m.vy=-2;if(m.hp<=0)killMob(m);}});
+        if(boss&&boss.alive&&Math.hypot(boss.x-p.x,boss.y-p.y)<boss.r+6){boss.hp-=p.dmg;boss.hit=8;boss.kbx=(boss.x>=p.x?1:-1)*2;if(boss.hp<=0)winGame();}
       }
       if(p.type==='bossbolt'&&Math.hypot(G.px-p.x,G.py-p.y)<14){hurtPlayer(p.dmg);p.life=0;}
     }else{p.x+=(p.dx||0);p.y+=(p.dy||0);}
