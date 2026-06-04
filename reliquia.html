@@ -844,7 +844,7 @@ function gainResp(n){
   }
 }
 
-function spawnSlash(x,y,big){particles.push({type:'slash',x,y,life:8,big});}
+function spawnSlash(x,y,big){particles.push({type:'slash',x,y,life:8,maxlife:8,big,dir:G.dir});}
 
 // ---------- daño al jugador ----------
 function hurtPlayer(d){
@@ -1068,9 +1068,15 @@ function drawHero(cx0,cy0,dir,frame,moving){
   const step=moving?[0,2,0,-2][frame]:0;
   const back=(dir==='up');                       // de espaldas
   const uy=cy0+(moving?(frame%2?-1:0):0);         // rebote sutil del torso al caminar (piernas fijas)
-  // sombra (en el suelo, no rebota)
+  // ---- impulso del golpe (lunge): el cuerpo se lanza hacia donde ataca ----
+  const atkP=G.atkTimer>0?G.atkTimer/Math.max(1,G.atkSpeed):0; // 1 al inicio del golpe → 0
+  const swing=Math.sin((1-atkP)*Math.PI);          // 0 → 1 (mitad del golpe) → 0
+  const lungeX=(dir==='left'?-1:dir==='right'?1:0)*swing*3;
+  const lungeY=(dir==='up'?-1:dir==='down'?1:0)*swing*2;
+  // sombra (en el suelo, no rebota ni se lanza)
   cx.fillStyle='rgba(0,25,0,.4)';
   cx.beginPath();cx.ellipse(cx0,cy0+15,11,4,0,0,7);cx.fill();
+  cx.save();cx.translate(lungeX,lungeY);          // el resto del cuerpo acompaña el golpe
 
   // ---- mochila redondeada ----
   const packCol='#5a3e22',packHi='#7a5630',packSh='#3e2a16';
@@ -1166,6 +1172,7 @@ function drawHero(cx0,cy0,dir,frame,moving){
   // látigo enrollado al cinturón (lado opuesto a la mano)
   if(!back && !isTank){ const lx=dir==='left'?cx0+7:cx0-11;
     cx.strokeStyle='#3e2a16';cx.lineWidth=2;cx.beginPath();cx.arc(lx,uy+3,3,0,7);cx.stroke(); }
+  cx.restore();                                   // fin del lunge del golpe
 }
 
 // Monstruos: cada tipo su forma, mira a m.dir, flota/camina con m.animT
@@ -1589,10 +1596,16 @@ function render(){
   }
   // particulas
   particles.forEach(p=>{
-    if(p.type==='slash'){cx.strokeStyle='rgba(255,255,255,.9)';cx.lineWidth=3;cx.beginPath();
-      cx.arc(p.x,p.y,p.big?38:24,-0.3,Math.PI*1.5);cx.stroke();
-      cx.strokeStyle='rgba(180,220,255,.5)';cx.lineWidth=1;cx.beginPath();
-      cx.arc(p.x,p.y,p.big?34:20,-0.3,Math.PI*1.5);cx.stroke();}
+    if(p.type==='slash'){
+      const ang={right:0,down:Math.PI/2,left:Math.PI,up:-Math.PI/2}[p.dir||'right'];
+      const R=p.big?38:24, sweep=2.0;
+      const a0=ang-sweep/2, prog=1-(p.life/(p.maxlife||8)); // el filo barre 0→1
+      const cur=a0+sweep*prog;
+      cx.globalAlpha=Math.min(1,p.life/4);
+      cx.strokeStyle='rgba(255,255,255,.9)';cx.lineWidth=3;cx.beginPath();cx.arc(p.x,p.y,R,a0,cur);cx.stroke();
+      cx.strokeStyle='rgba(180,220,255,.5)';cx.lineWidth=1;cx.beginPath();cx.arc(p.x,p.y,R-5,a0,cur);cx.stroke();
+      cx.fillStyle='rgba(255,255,255,.95)';cx.beginPath();cx.arc(p.x+Math.cos(cur)*R,p.y+Math.sin(cur)*R,3,0,7);cx.fill(); // destello en la punta
+      cx.globalAlpha=1;}
     else if(p.type==='bolt'){cx.fillStyle='#9bf04f';cx.beginPath();cx.arc(p.x,p.y,6,0,7);cx.fill();
       cx.fillStyle='#fff';cx.beginPath();cx.arc(p.x,p.y,2,0,7);cx.fill();}
     else if(p.type==='bossbolt'){cx.fillStyle='#c43a2c';cx.beginPath();cx.arc(p.x,p.y,6,0,7);cx.fill();
