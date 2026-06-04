@@ -1046,6 +1046,18 @@ function showBossIntro(){
 // ---------- render ----------
 function drawRect(x,y,w,h,c){cx.fillStyle=c;cx.fillRect(x|0,y|0,w,h);}
 function px2(x,y,w,h,c){cx.fillStyle=c;cx.fillRect(x|0,y|0,w,h);} // alias corto
+// rectángulo redondeado (para formas orgánicas, no cuadradas)
+function rr(x,y,w,h,r,c){
+  if(c)cx.fillStyle=c;
+  const k=Math.min(r,w/2,h/2);
+  cx.beginPath();
+  cx.moveTo(x+k,y);
+  cx.arcTo(x+w,y,x+w,y+h,k);
+  cx.arcTo(x+w,y+h,x,y+h,k);
+  cx.arcTo(x,y+h,x,y,k);
+  cx.arcTo(x,y,x+w,y,k);
+  cx.closePath();cx.fill();
+}
 
 // ===== SPRITES =====
 // Héroe EXPLORADOR: base aventurero (sombrero, chaqueta, mochila) + detalles de clase.
@@ -1054,100 +1066,106 @@ function drawHero(cx0,cy0,dir,frame,moving){
   const cls=G.classes;
   const isTank=cls.includes('tanque'), isMage=cls.includes('mago'), isAss=cls.includes('asesino');
   const step=moving?[0,2,0,-2][frame]:0;
-  const back=(dir==='up');           // de espaldas
-  // sombra
+  const back=(dir==='up');                       // de espaldas
+  const uy=cy0+(moving?(frame%2?-1:0):0);         // rebote sutil del torso al caminar (piernas fijas)
+  // sombra (en el suelo, no rebota)
   cx.fillStyle='rgba(0,25,0,.4)';
   cx.beginPath();cx.ellipse(cx0,cy0+15,11,4,0,0,7);cx.fill();
 
-  // ---- mochila (detrás cuando mira abajo/lados; visible y grande cuando de espaldas) ----
+  // ---- mochila redondeada ----
   const packCol='#5a3e22',packHi='#7a5630',packSh='#3e2a16';
-  if(back){ // mochila domina la vista trasera
-    px2(cx0-9,cy0-12,18,22,packCol); px2(cx0-9,cy0-12,18,5,packHi);
-    px2(cx0-9,cy0-12,4,22,packSh); px2(cx0+5,cy0-12,4,22,packSh);
-    cx.fillStyle='#6a4a2a';cx.beginPath();cx.arc(cx0,cy0-1,5,0,7);cx.fill(); // bulto enrollado
-    px2(cx0-7,cy0+2,14,3,'#4a3219'); // correa
+  if(back){ // domina la vista trasera
+    rr(cx0-9,uy-12,18,22,7,packCol);
+    rr(cx0-9,uy-12,18,8,6,packHi);
+    cx.fillStyle=packSh;cx.beginPath();cx.ellipse(cx0,uy-1,5.5,6,0,0,7);cx.fill(); // bulto (base)
+    cx.fillStyle='#6a4a2a';cx.beginPath();cx.arc(cx0,uy-2,5,0,7);cx.fill();         // bulto enrollado
+    cx.strokeStyle='#4a3219';cx.lineWidth=3;cx.lineCap='round';
+    cx.beginPath();cx.moveTo(cx0-7,uy+4);cx.lineTo(cx0+7,uy+4);cx.stroke();cx.lineCap='butt'; // correa
   } else { // asoma por un costado
     const psx=dir==='left'?cx0+4:cx0-12;
-    px2(psx,cy0-10,8,18,packCol); px2(psx,cy0-10,8,4,packHi);
-    cx.fillStyle='#6a4a2a';cx.beginPath();cx.arc(psx+4,cy0-2,4,0,7);cx.fill();
+    rr(psx,uy-10,8,18,5,packCol); rr(psx,uy-10,8,7,4,packHi);
+    cx.fillStyle='#6a4a2a';cx.beginPath();cx.arc(psx+4,uy-2,4,0,7);cx.fill();
   }
 
-  // ---- piernas con botas ----
+  // ---- piernas con botas redondeadas (ancladas al suelo) ----
   const pant='#9a8050', pantSh='#7a6038', boot='#4a3018';
-  px2(cx0-8,cy0+5+(step>0?2:0),6,8,pant); px2(cx0-8,cy0+11+(step>0?2:0),6,4,boot);
-  px2(cx0+2,cy0+5+(step<0?2:0),6,8,pant); px2(cx0+2,cy0+11+(step<0?2:0),6,4,boot);
-  px2(cx0-8,cy0+5+(step>0?2:0),2,8,pantSh);
+  const lL=cy0+5+(step>0?2:0), lR=cy0+5+(step<0?2:0);
+  rr(cx0-8,lL,6,9,3,pant); rr(cx0+2,lR,6,9,3,pant);
+  rr(cx0-8,lL,2,9,1,pantSh);                       // sombra interior pierna
+  rr(cx0-9,lL+8,7,4,2,boot); rr(cx0+1,lR+8,7,4,2,boot); // botas con punta redondeada
 
-  // ---- torso: chaqueta marrón de aventurero ----
-  let jacket = '#6e4a28', jacketHi='#8a6038', jacketSh='#4a3018';
-  // tinte por clase dominante (sutil, para no perder al explorador)
+  // ---- torso: chaqueta de aventurero (hombros redondeados) ----
+  let jacket='#6e4a28', jacketHi='#8a6038', jacketSh='#4a3018';
   if(isMage){jacket='#5a3a5a';jacketHi='#7a5278';jacketSh='#3e2640';}
   if(isTank){jacket='#4a5a6e';jacketHi='#6a7e92';jacketSh='#33414e';}
-  px2(cx0-10,cy0-8,20,16,jacket);
-  px2(cx0-10,cy0-8,20,4,jacketHi);                 // luz hombros
-  px2(cx0-10,cy0+4,20,4,jacketSh);                 // sombra
-  px2(cx0-10,cy0-8,3,16,'rgba(255,255,255,.12)');
-  px2(cx0+7,cy0-8,3,16,'rgba(0,0,0,.22)');
+  rr(cx0-10,uy-8,20,17,7,jacket);
+  cx.fillStyle=jacketHi;                           // luz redonda en hombros
+  cx.beginPath();cx.ellipse(cx0-6,uy-5,5,4,0,0,7);cx.fill();
+  cx.beginPath();cx.ellipse(cx0+6,uy-5,5,4,0,0,7);cx.fill();
+  rr(cx0-10,uy+4,20,5,4,jacketSh);                 // sombra inferior
+  rr(cx0-10,uy-8,3,15,3,'rgba(255,255,255,.12)');
+  rr(cx0+7,uy-8,3,15,3,'rgba(0,0,0,.22)');
   if(!back){ // camisa clara abierta + cinturón
-    px2(cx0-3,cy0-7,6,12,'#ccbb88'); px2(cx0-3,cy0-7,6,3,'#e0d2a0');
-    px2(cx0-10,cy0+5,20,3,'#3e2a16'); px2(cx0-2,cy0+5,4,3,'#c9a24a'); // hebilla
+    rr(cx0-3,uy-7,6,13,3,'#ccbb88'); rr(cx0-3,uy-7,6,4,2,'#e0d2a0');
+    rr(cx0-10,uy+5,20,3,1,'#3e2a16');
+    cx.fillStyle='#c9a24a';cx.beginPath();cx.arc(cx0,uy+6,2.5,0,7);cx.fill(); // hebilla redonda
   }
-  // detalle de clase en el pecho
-  if(isMage && !back){px2(cx0-2,cy0-3,4,4,'#7fe0f0');px2(cx0-1,cy0-2,2,2,'#fff');} // amuleto mago
-  if(isTank && !back){px2(cx0-9,cy0-6,5,12,'#9cb8e0');} // placa de hombro
+  if(isMage && !back){ // amuleto del mago
+    cx.fillStyle='#7fe0f0';cx.beginPath();cx.arc(cx0,uy-2,2.5,0,7);cx.fill();
+    cx.fillStyle='#fff';cx.beginPath();cx.arc(cx0-1,uy-3,1,0,7);cx.fill();
+  }
+  if(isTank && !back) rr(cx0-10,uy-7,5,13,3,'#9cb8e0'); // placa de hombro
 
-  // ---- cabeza + SOMBRERO DE ALA ANCHA (la firma del explorador) ----
+  // ---- cabeza redondeada ----
   const skin='#e8b890', skinSh='#c89068';
   if(!back){
-    px2(cx0-7,cy0-20,14,13,skin); px2(cx0-7,cy0-20,14,3,'#f4c8a0');
-    px2(cx0+4,cy0-20,3,13,skinSh);
-    // barba incipiente
-    px2(cx0-6,cy0-10,12,3,'rgba(90,60,30,.4)');
+    cx.fillStyle=skin;cx.beginPath();cx.ellipse(cx0,uy-13,7,7.5,0,0,7);cx.fill();
+    cx.fillStyle='#f4c8a0';cx.beginPath();cx.ellipse(cx0-2,uy-15,4,3,0,0,7);cx.fill();   // luz
+    cx.fillStyle=skinSh;cx.beginPath();cx.ellipse(cx0+4,uy-12,2.5,5,0,0,7);cx.fill();    // sombra mejilla
+    cx.fillStyle='rgba(90,60,30,.35)';cx.beginPath();cx.ellipse(cx0,uy-8,6,3,0,0,7);cx.fill(); // barba incipiente
   } else {
-    px2(cx0-7,cy0-20,14,13,'#3a2818'); // nuca/pelo
+    cx.fillStyle='#3a2818';cx.beginPath();cx.ellipse(cx0,uy-13,7,7.5,0,0,7);cx.fill();   // nuca/pelo
   }
-  // sombrero (siempre, define al personaje)
-  if(isMage){ // sombrero de explorador con toque mago (banda azul, ala más alzada)
-    px2(cx0-13,cy0-23,26,5,'#5a3a5a'); px2(cx0-13,cy0-23,26,2,'#7a5278');  // ala
-    px2(cx0-8,cy0-31,16,9,'#4a2e4a'); px2(cx0-8,cy0-31,16,3,'#6a4a6a');    // copa
-    px2(cx0-8,cy0-24,16,2,'#7fe0f0');                                       // banda mística
-  } else if(isTank){ // sombrero con refuerzo metálico
-    px2(cx0-13,cy0-23,26,5,'#4a5a6e'); px2(cx0-13,cy0-23,26,2,'#6a7e92');
-    px2(cx0-8,cy0-31,16,9,'#3a4a5a'); px2(cx0-8,cy0-31,16,3,'#5a6e82');
-    px2(cx0-8,cy0-24,16,2,'#9cb8e0');
-  } else { // explorador clásico marrón
-    px2(cx0-13,cy0-23,26,5,'#6e4a28'); px2(cx0-13,cy0-23,26,2,'#8a6038');  // ala ancha
-    px2(cx0-8,cy0-31,16,9,'#5a3a1e'); px2(cx0-8,cy0-31,16,3,'#7a5230');    // copa
-    px2(cx0-8,cy0-24,16,2,'#3e2a16');                                       // banda
-  }
-  // sombra del ala sobre la cara
-  if(!back)px2(cx0-7,cy0-20,14,2,'rgba(0,0,0,.25)');
+  // ---- sombrero de ala ancha (ala = elipse, copa redondeada) ----
+  let brim,brimHi,crown,crownHi,band;
+  if(isMage){brim='#5a3a5a';brimHi='#7a5278';crown='#4a2e4a';crownHi='#6a4a6a';band='#7fe0f0';}
+  else if(isTank){brim='#4a5a6e';brimHi='#6a7e92';crown='#3a4a5a';crownHi='#5a6e82';band='#9cb8e0';}
+  else{brim='#6e4a28';brimHi='#8a6038';crown='#5a3a1e';crownHi='#7a5230';band='#3e2a16';}
+  cx.fillStyle=brim;cx.beginPath();cx.ellipse(cx0,uy-20,14,4.5,0,0,7);cx.fill();         // ala
+  cx.fillStyle=brimHi;cx.beginPath();cx.ellipse(cx0,uy-21,13,3,0,0,7);cx.fill();
+  rr(cx0-8,uy-30,16,12,6,crown);                                                         // copa
+  cx.fillStyle=crownHi;cx.beginPath();cx.ellipse(cx0-2,uy-27,5,3,0,0,7);cx.fill();
+  rr(cx0-8,uy-23,16,2,1,band);                                                           // banda
+  if(!back){cx.fillStyle='rgba(0,0,0,.22)';cx.beginPath();cx.ellipse(cx0,uy-18,7,2,0,0,7);cx.fill();} // sombra del ala
   // ojos
   if(!back){
-    px2(cx0-4,cy0-15,3,3,'#2a1a12'); px2(cx0+2,cy0-15,3,3,'#2a1a12');
-    px2(cx0-4,cy0-15,1,1,'#fff'); px2(cx0+2,cy0-15,1,1,'#fff');
+    cx.fillStyle='#2a1a12';cx.beginPath();cx.arc(cx0-3,uy-15,1.6,0,7);cx.fill();cx.beginPath();cx.arc(cx0+3,uy-15,1.6,0,7);cx.fill();
+    cx.fillStyle='#fff';cx.beginPath();cx.arc(cx0-3.4,uy-15.5,.6,0,7);cx.fill();cx.beginPath();cx.arc(cx0+2.6,uy-15.5,.6,0,7);cx.fill();
   }
 
-  // ---- objeto en mano: mapa/libro (base), o arma de clase ----
+  // ---- objeto en mano según clase ----
   const hx = dir==='left'?cx0-14: dir==='right'?cx0+8: cx0+6;
-  if(isAss){ // daga en vez de mapa
-    px2(hx,cy0-4,3,12,'#dfe8f0'); px2(hx,cy0-4,1,12,'#fff');
-    px2(hx-2,cy0+7,7,3,'#4a3018');
+  if(isAss){ // daga afilada
+    cx.fillStyle='#dfe8f0';cx.beginPath();cx.moveTo(hx+1.5,uy-5);cx.lineTo(hx+3.5,uy+6);cx.lineTo(hx-0.5,uy+6);cx.closePath();cx.fill();
+    cx.fillStyle='#fff';cx.fillRect(hx+1,uy-5,1,11);
+    rr(hx-2,uy+6,7,3,1.5,'#4a3018');               // guarda
   } else if(isMage){ // bastón con orbe
-    px2(hx,cy0-14,3,22,'#6a4a2a'); px2(hx,cy0-14,1,22,'#8a6a3a');
-    cx.fillStyle='#5fd0e0';cx.beginPath();cx.arc(hx+1,cy0-16,5,0,7);cx.fill();
-    cx.fillStyle='#c0f4ff';cx.beginPath();cx.arc(hx,cy0-17,2,0,7);cx.fill();
-  } else if(isTank){ // escudo
-    const sx=dir==='left'?cx0+6:cx0-14;
-    px2(sx,cy0-4,7,14,'#9cb8e0'); px2(sx,cy0-4,7,3,'#c0d8f0');
-    px2(sx+2,cy0,3,7,'#5577aa');
-  } else if(!back){ // explorador puro: mapa abierto en la mano
-    px2(hx,cy0-2,9,8,'#d8c89a'); px2(hx,cy0-2,9,2,'#f0e4c0');
-    px2(hx+1,cy0,2,1,'#6a4a2a'); px2(hx+4,cy0+2,3,1,'#6a4a2a'); // marcas del mapa
+    cx.strokeStyle='#6a4a2a';cx.lineWidth=3;cx.lineCap='round';
+    cx.beginPath();cx.moveTo(hx+1.5,uy-12);cx.lineTo(hx+1.5,uy+8);cx.stroke();cx.lineCap='butt';
+    cx.fillStyle='#5fd0e0';cx.beginPath();cx.arc(hx+1.5,uy-15,5,0,7);cx.fill();
+    cx.fillStyle='#c0f4ff';cx.beginPath();cx.arc(hx,uy-16,2,0,7);cx.fill();
+  } else if(isTank){ // escudo ovalado
+    const sx=dir==='left'?cx0+10:cx0-10;
+    cx.fillStyle='#9cb8e0';cx.beginPath();cx.ellipse(sx,uy+1,5,8,0,0,7);cx.fill();
+    cx.fillStyle='#c0d8f0';cx.beginPath();cx.ellipse(sx-1,uy-2,3,4,0,0,7);cx.fill();
+    cx.fillStyle='#5577aa';cx.beginPath();cx.arc(sx,uy+1,2,0,7);cx.fill();
+  } else if(!back){ // explorador puro: mapa abierto
+    rr(hx,uy-2,9,8,2,'#d8c89a'); rr(hx,uy-2,9,3,2,'#f0e4c0');
+    cx.fillStyle='#6a4a2a';cx.fillRect(hx+1,uy,2,1);cx.fillRect(hx+4,uy+2,3,1); // marcas del mapa
   }
-  // látigo enrollado al cinturón (detalle de explorador, lado opuesto a la mano)
+  // látigo enrollado al cinturón (lado opuesto a la mano)
   if(!back && !isTank){ const lx=dir==='left'?cx0+7:cx0-11;
-    cx.strokeStyle='#3e2a16';cx.lineWidth=2;cx.beginPath();cx.arc(lx,cy0+3,3,0,7);cx.stroke(); }
+    cx.strokeStyle='#3e2a16';cx.lineWidth=2;cx.beginPath();cx.arc(lx,uy+3,3,0,7);cx.stroke(); }
 }
 
 // Monstruos: cada tipo su forma, mira a m.dir, flota/camina con m.animT
