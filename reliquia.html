@@ -682,16 +682,18 @@ function buildingAt(tx,ty){
 // ---------- entidades ----------
 let mobs=[],clues=[],particles=[],boss=null;
 const MOB_TYPES={
-  baba:    {name:'Baba del Lodo', hp:8,  dmg:2, sp:1.0, col:'#6a8f2a', r:12, gold:3,  reward:{hp:2,line:'+2 vida máx.'}},
-  reptil:  {name:'Reptil Ciego',  hp:14, dmg:4, sp:1.6, col:'#3a6e2a', r:14, gold:6,  reward:{dmg:1,line:'+1 daño'}},
-  espectro:{name:'Espectro Pálido',hp:10,dmg:3, sp:2.2,col:'#9bbc0f', r:12, gold:8,  reward:{speed:.2,line:'+vel. movimiento'}},
-  guardian:{name:'Guardián Roto', hp:22, dmg:6, sp:1.2, col:'#c4a020', r:16, gold:14, reward:{atkSpeed:-2,line:'+vel. ataque'}},
+  baba:      {name:'Baba del Lodo',          hp:8,  dmg:2, sp:1.0, col:'#6a8f2a', r:12, gold:3,  reward:{hp:2,line:'+2 vida máx.'}},
+  reptil:    {name:'Reptil Ciego',           hp:14, dmg:4, sp:1.6, col:'#3a6e2a', r:14, gold:6,  reward:{dmg:1,line:'+1 daño'}},
+  espectro:  {name:'Espectro Pálido',        hp:10, dmg:3, sp:2.2, col:'#9bbc0f', r:12, gold:8,  reward:{speed:.2,line:'+vel. movimiento'}, flying:true},
+  murcielago:{name:'Murciélago de Obsidiana',hp:6,  dmg:3, sp:2.8, col:'#5a3e6e', r:10, gold:7,  reward:{atkSpeed:-1,line:'+vel. ataque (reflejos)'}, flying:true},
+  arana:     {name:'Araña de las Sombras',   hp:12, dmg:4, sp:2.4, col:'#2a1e3a', r:13, gold:10, reward:{hp:3,line:'+3 vida máx. (instinto)'}},
+  guardian:  {name:'Guardián Roto',          hp:22, dmg:6, sp:1.2, col:'#c4a020', r:16, gold:14, reward:{atkSpeed:-2,line:'+vel. ataque'}},
 };
 
 function spawnMob(type,tx,ty){
   const t=MOB_TYPES[type];
   mobs.push({type,name:t.name,hp:t.hp,maxhp:t.hp,dmg:t.dmg,sp:t.sp,col:t.col,r:t.r,
-             gold:t.gold,reward:t.reward,x:tx*TILE+16,y:ty*TILE+16,hit:0,
+             gold:t.gold,reward:t.reward,flying:!!t.flying,x:tx*TILE+16,y:ty*TILE+16,hit:0,
              dir:'down',animT:Math.random()*20,bob:Math.random()*6});
 }
 function spawnClue(tx,ty){clues.push({x:tx*TILE+16,y:ty*TILE+16,taken:false,bob:Math.random()*6});}
@@ -707,6 +709,10 @@ function enterDungeon(full){
   spawnMob('reptil',20,16);spawnMob('reptil',28,16);
   // espectros vuelan a media altura
   spawnMob('espectro',13,8);spawnMob('espectro',22,6);spawnMob('espectro',30,10);
+  // murciélagos: vuelo errático en lo alto
+  spawnMob('murcielago',9,5);spawnMob('murcielago',26,4);spawnMob('murcielago',33,7);
+  // arañas: acechan ágiles en el suelo
+  spawnMob('arana',12,16);spawnMob('arana',23,16);spawnMob('arana',32,16);
   spawnMob('guardian',18,16);spawnMob('guardian',34,16);
   // pistas: en plataformas altas y al fondo
   spawnClue(11,2);spawnClue(24,6);spawnClue(36,16);
@@ -938,7 +944,7 @@ function update(){
     if(m.vy===undefined)m.vy=0;
     const dx=G.px-m.x, dy=G.py-m.y;
     const d=Math.hypot(dx,dy);
-    const flying=(m.type==='espectro');
+    const flying=m.flying;
     if(d<140&&Math.abs(dx)>2){
       m.dir = dx>0?'right':'left';
       const step=(dx>0?1:-1)*m.sp;
@@ -947,6 +953,8 @@ function update(){
     if(flying){
       // flota hacia la altura del jugador
       if(Math.abs(dy)>2 && d<140) m.y += (dy>0?1:-1)*m.sp*0.6;
+      // el murciélago aletea errático arriba/abajo
+      if(m.type==='murcielago') m.y += Math.sin(m.animT*0.13)*0.9;
     } else {
       // gravedad
       m.vy+=G.gravity;
@@ -1151,6 +1159,8 @@ function drawMob(m){
   if(m.type==='baba')       drawBaba(m,f,C);
   else if(m.type==='reptil') drawReptil(m,f,C);
   else if(m.type==='espectro')drawEspectro(m,f,C);
+  else if(m.type==='murcielago')drawMurcielago(m,f,C);
+  else if(m.type==='arana')  drawArana(m,f,C);
   else if(m.type==='guardian')drawGuardian(m,f,C);
   if(m.hp<m.maxhp){px2(m.x-m.r,m.y-m.r-8,m.r*2,4,'#3a0808');px2(m.x-m.r,m.y-m.r-8,m.r*2*(m.hp/m.maxhp),4,'#e34');
     px2(m.x-m.r,m.y-m.r-8,m.r*2*(m.hp/m.maxhp),1,'#f88');}
@@ -1200,6 +1210,55 @@ function drawEspectro(m,f,C){ // espectro etéreo flotante
   let ex=m.dir==='left'?-3:m.dir==='right'?3:0;
   cx.fillStyle='#16323e';cx.beginPath();cx.ellipse(x-4+ex,y-3,2,3,0,0,7);cx.fill();cx.beginPath();cx.ellipse(x+3+ex,y-3,2,3,0,0,7);cx.fill();
   cx.fillStyle='#5fd0e0';cx.beginPath();cx.arc(x-4+ex,y-3,1,0,7);cx.fill();cx.beginPath();cx.arc(x+3+ex,y-3,1,0,7);cx.fill();
+}
+function drawMurcielago(m,f,C){ // murciélago de obsidiana, alas que aletean
+  const x=m.x, y=m.y+Math.sin(m.animT*0.12)*2;
+  const wing=f?-4:4;                 // aleteo
+  const face=m.dir==='left'?-1:1;
+  // alas membranosas
+  cx.fillStyle=C||'#3a2a4e';
+  cx.beginPath();cx.moveTo(x,y);cx.lineTo(x-16,y-6+wing);cx.lineTo(x-11,y+2);cx.lineTo(x-15,y+5+wing);cx.lineTo(x-6,y+3);cx.closePath();cx.fill();
+  cx.beginPath();cx.moveTo(x,y);cx.lineTo(x+16,y-6+wing);cx.lineTo(x+11,y+2);cx.lineTo(x+15,y+5+wing);cx.lineTo(x+6,y+3);cx.closePath();cx.fill();
+  // brillo obsidiana
+  cx.fillStyle=C||'#6a4e8e';
+  cx.beginPath();cx.moveTo(x-2,y-1);cx.lineTo(x-12,y-4+wing);cx.lineTo(x-9,y+1);cx.closePath();cx.fill();
+  cx.beginPath();cx.moveTo(x+2,y-1);cx.lineTo(x+12,y-4+wing);cx.lineTo(x+9,y+1);cx.closePath();cx.fill();
+  // cuerpo
+  cx.fillStyle=C||'#241830';cx.beginPath();cx.ellipse(x,y+1,6,7,0,0,7);cx.fill();
+  cx.fillStyle=C||'#3a2a4e';cx.beginPath();cx.ellipse(x-1,y-1,4,4,0,0,7);cx.fill();
+  // orejas
+  cx.fillStyle=C||'#241830';
+  cx.beginPath();cx.moveTo(x-4,y-5);cx.lineTo(x-6,y-11);cx.lineTo(x-1,y-6);cx.fill();
+  cx.beginPath();cx.moveTo(x+4,y-5);cx.lineTo(x+6,y-11);cx.lineTo(x+1,y-6);cx.fill();
+  // ojos rojos
+  cx.fillStyle='#e34';cx.beginPath();cx.arc(x-2+face,y-1,1.6,0,7);cx.fill();cx.beginPath();cx.arc(x+2+face,y-1,1.6,0,7);cx.fill();
+  cx.fillStyle='#ff8';cx.beginPath();cx.arc(x-2+face,y-1,.7,0,7);cx.fill();cx.beginPath();cx.arc(x+2+face,y-1,.7,0,7);cx.fill();
+}
+function drawArana(m,f,C){ // araña de las sombras, patas que se mueven
+  const x=m.x,y=m.y,lg=f?2:-2;
+  const face=m.dir==='left'?-1:1;
+  // patas (4 por lado), articuladas
+  cx.strokeStyle=C||'#140e1e';cx.lineWidth=2;cx.lineCap='round';
+  for(let i=0;i<4;i++){
+    const oy=y-4+i*4, sp=(i%2?lg:-lg);
+    cx.beginPath();cx.moveTo(x-5,oy);cx.lineTo(x-12,oy-3+sp);cx.lineTo(x-15,oy+4);cx.stroke();
+    cx.beginPath();cx.moveTo(x+5,oy);cx.lineTo(x+12,oy-3-sp);cx.lineTo(x+15,oy+4);cx.stroke();
+  }
+  cx.lineCap='butt';
+  // abdomen
+  cx.fillStyle=C||'#1e1430';cx.beginPath();cx.ellipse(x,y+3,10,9,0,0,7);cx.fill();
+  cx.fillStyle=C||'#3a2a52';cx.beginPath();cx.ellipse(x-2,y+1,6,5,0,0,7);cx.fill();
+  // marca de reloj de arena en el lomo
+  cx.fillStyle=C||'#7a2a3a';cx.beginPath();cx.moveTo(x,y-2);cx.lineTo(x-4,y+5);cx.lineTo(x,y+3);cx.lineTo(x+4,y+5);cx.closePath();cx.fill();
+  // cefalotórax (cabeza)
+  cx.fillStyle=C||'#241836';cx.beginPath();cx.ellipse(x+face*4,y-5,6,5,0,0,7);cx.fill();
+  // ojos múltiples rojos
+  cx.fillStyle='#e34';
+  cx.beginPath();cx.arc(x+face*4-3,y-6,1.4,0,7);cx.fill();
+  cx.beginPath();cx.arc(x+face*4+3,y-6,1.4,0,7);cx.fill();
+  cx.beginPath();cx.arc(x+face*4-1,y-4,1,0,7);cx.fill();
+  cx.beginPath();cx.arc(x+face*4+1,y-4,1,0,7);cx.fill();
+  cx.fillStyle='#ff8';cx.beginPath();cx.arc(x+face*4-3,y-6,.6,0,7);cx.fill();cx.beginPath();cx.arc(x+face*4+3,y-6,.6,0,7);cx.fill();
 }
 function drawGuardian(m,f,C){ // guardián de piedra agrietado
   const x=m.x,y=m.y,R=m.r;

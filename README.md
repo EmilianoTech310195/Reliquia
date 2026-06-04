@@ -74,7 +74,7 @@ El juego tiene **dos vistas distintas** según `G.scene`:
 - `isRock(x,y)` detecta vecinos para dibujar bordes orgánicos.
 - Suelo principal en fila 18-19; plataformas a varias alturas; 3 pistas (2 en alto, 1 al fondo).
 - Combate cuerpo a cuerpo (golpe hacia los lados según `G.dir`).
-- Enemigos terrestres tienen gravedad; **espectros vuelan** (excepción).
+- Enemigos terrestres (baba/reptil/araña/guardián) tienen gravedad; **espectros y murciélagos vuelan** (flag `flying` en `MOB_TYPES`). El murciélago aletea errático en vertical.
 - Jefe (Rey de Piedra) aparece al fondo derecha, persigue horizontal con gravedad, lanza rocas en abanico.
 
 ### Mapas y tiles
@@ -91,7 +91,7 @@ El juego tiene **dos vistas distintas** según `G.scene`:
 
 ### Render
 - Dos pasadas de tiles: base (suelo/aire) y objetos altos (árboles, edificios, antorchas).
-- Funciones de dibujo por código (NO sprites): `drawHero` (explorador con sombrero/mochila, por clase), `drawMob` (baba/reptil/espectro/guardian), `drawCaveRock/drawCaveAir/drawTorch` (cueva atmosférica con estalactitas, vetas, bordes orgánicos), `drawStone/drawGrass/drawWater/...` (pueblo).
+- Funciones de dibujo por código (NO sprites): `drawHero` (explorador con sombrero/mochila, por clase), `drawMob` (baba/reptil/espectro/murcielago/arana/guardian), `drawCaveRock/drawCaveAir/drawTorch` (cueva atmosférica con estalactitas, vetas, bordes orgánicos), `drawStone/drawGrass/drawWater/...` (pueblo).
 - `applyZoneTint()` — atmósfera: cueva oscura/cálida con luz radial cerca del jugador; pueblo dorado suave.
 - Helpers: `vGrad` (gradiente vertical), `cellRnd(x,y,seed)` (ruido determinista por celda), `px2` (rect rápido).
 - Overlay CRT/scanlines opcional (tecla C).
