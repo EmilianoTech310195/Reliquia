@@ -509,6 +509,8 @@ const G={
   baseDmg:4,baseDef:0,baseMaxhp:20,   // stats sin equipo (clases)
   weapon:null,armor:null,  // equipo equipado {name,power,dur,maxDur,...}
   powers:new Set(),        // potenciadores permanentes comprados
+  relics:new Set(),        // objetos sagrados reclamados (poderes únicos)
+  goldMult:1,              // multiplicador de oro (reliquia)
   potions:0,               // pociones en bolsa
   near:null,               // edificio/NPC cercano para interactuar
   godWarned:false,         // si el dios ya advirtió al entrar a la cueva
@@ -556,6 +558,15 @@ const SHOP_ENCHANTS=[
   {id:'en4',name:'Fortaleza',     desc:'+12 vida a la armadura', price:120, slot:'armor',  apply:a=>{a.hp+=12;}},
 ];
 const REPAIR_COST_PER_PCT=2; // oro por cada % a reparar
+// objetos sagrados: un poder PERMANENTE único por cueva, guardado tras el guardián del fondo
+const RELICS={
+  'CUEVA DEL TEMPLO':{id:'r_templo',name:'Corazón de Obsidiana',desc:'+20 vida máx · robo de vida',
+    apply(){G.baseMaxhp+=20;G.lifesteal=(G.lifesteal||0)+3;}},
+  'CUEVA DE JADE':{id:'r_jade',name:'Ojo de Jade',desc:'+3 daño · +50% oro',
+    apply(){G.baseDmg+=3;G.goldMult=(G.goldMult||1)+0.5;}},
+  'GRUTA SOMBRÍA':{id:'r_gruta',name:'Garra Sombría',desc:'+vel. de ataque · +2 defensa',
+    apply(){G.atkSpeed=Math.max(4,G.atkSpeed-3);G.baseDef+=2;}},
+};
 
 // ---------- mundo: mapa de tiles 16-bit (bosque y río) ----------
 // tipos: 0=hierba  1=árbol(sólido)  2=agua(sólido)  3=camino tierra  4=arbusto(sólido)  5=flores(hierba)
@@ -724,6 +735,7 @@ function buildingAt(tx,ty){ return TOWN_INFO[tx+','+ty]||null; }
 let mobs=[],clues=[],particles=[],boss=null;
 let curCaveArt=[];   // nivel de cueva actual (generado)
 let portal=null;     // salida del nivel hacia el siguiente
+let altar=null;      // altar del objeto sagrado (tras el guardián)
 const MOB_TYPES={
   baba:      {name:'Baba del Lodo',          hp:8,  dmg:2, sp:1.0, col:'#6a8f2a', r:12, gold:3,  reward:{hp:2,line:'+2 vida máx.'}},
   reptil:    {name:'Reptil Ciego',           hp:14, dmg:4, sp:1.6, col:'#3a6e2a', r:14, gold:6,  reward:{dmg:1,line:'+1 daño'}},
@@ -781,7 +793,7 @@ function genArena(){ // sala del jefe (plana con esquive)
   return {art:g.map(r=>r.join('')), W, H};
 }
 function loadLevel(){
-  mobs=[];particles=[];boss=null;clues=[];portal=null;G.bossSpawned=false;
+  mobs=[];particles=[];boss=null;clues=[];portal=null;altar=null;G.bossSpawned=false;
   if(G.level>G.levelsTotal){                       // tras el nivel 15: el jefe
     const a=genArena(); curCaveArt=a.art; buildMap();
     G.px=3*TILE+16;G.py=(a.H-5)*TILE;G.vy=0;G.grounded=false;
@@ -904,11 +916,11 @@ function hitArea(hx,hy,rad,dmg){
     boss.hp-=dmg;boss.hit=8;
     boss.kbx=(boss.x>=hx?1:-1)*2; // el coloso apenas se tambalea
     for(let i=0;i<6;i++)particles.push({type:'spark',x:boss.x,y:boss.y,dx:(Math.random()-.5)*3,dy:(Math.random()-.5)*3,life:18,col:'#e8c547'});
-    if(boss.hp<=0)winGame();
+    if(boss.hp<=0)defeatBoss();
   }
 }
 function killMob(m){
-  G.gold+=m.gold;
+  G.gold+=Math.round(m.gold*(G.goldMult||1));
   // recompensa por monstruo NUEVO
   if(!G.seen.has(m.type)){
     G.seen.add(m.type);
@@ -1060,6 +1072,10 @@ function update(){
   if(portal){ portal.t++;
     if(Math.hypot(G.px-portal.x,G.py-portal.y)<22){ advanceLevel(); return; }
   }
+  // altar del objeto sagrado: tocarlo lo reclama
+  if(altar){ altar.t++;
+    if(Math.hypot(G.px-altar.x,G.py-altar.y)<26){ claimRelic(altar.relic); return; }
+  }
 
   // boss
   if(boss&&boss.alive){
@@ -1098,7 +1114,7 @@ function update(){
       if(p.type==='bolt'){
         mobs.forEach(m=>{if(!p.hits.has(m)&&Math.hypot(m.x-p.x,m.y-p.y)<m.r+6){
           m.hp-=p.dmg;m.hit=8;p.hits.add(m);m.kbx=(m.x>=p.x?1:-1)*7;if(!m.flying)m.vy=-2;if(m.hp<=0)killMob(m);}});
-        if(boss&&boss.alive&&Math.hypot(boss.x-p.x,boss.y-p.y)<boss.r+6){boss.hp-=p.dmg;boss.hit=8;boss.kbx=(boss.x>=p.x?1:-1)*2;if(boss.hp<=0)winGame();}
+        if(boss&&boss.alive&&Math.hypot(boss.x-p.x,boss.y-p.y)<boss.r+6){boss.hp-=p.dmg;boss.hit=8;boss.kbx=(boss.x>=p.x?1:-1)*2;if(boss.hp<=0)defeatBoss();}
       }
       if(p.type==='bossbolt'&&Math.hypot(G.px-p.x,G.py-p.y)<14){hurtPlayer(p.dmg);p.life=0;}
     }else{p.x+=(p.dx||0);p.y+=(p.dy||0);}
@@ -1779,6 +1795,18 @@ function render(){
     cx.fillStyle='rgba(220,255,245,'+(0.6*gl)+')';cx.beginPath();cx.ellipse(x,y-9,2.5,6,0,0,7);cx.fill();
     cx.fillStyle='#e8c547';for(let i=0;i<3;i++){const yy=y-22+i*9;px2(x-9,yy,3,3,'#e8c547');px2(x+6,yy,3,3,'#e8c547');} // glifos
   }
+  // altar del objeto sagrado
+  if(altar){ const x=altar.x, y=altar.y, t=altar.t*0.08, b=Math.sin(t)*3;
+    cx.save();cx.globalCompositeOperation='lighter';
+    const lg=cx.createLinearGradient(x,y-64,x,y); lg.addColorStop(0,'rgba(255,230,120,0)');lg.addColorStop(1,'rgba(255,230,120,.28)');
+    cx.fillStyle=lg;cx.fillRect(x-11,y-64,22,64);cx.restore();
+    cx.fillStyle='#6a6258';rr(x-12,y-2,24,12,2,'#6a6258');           // pedestal
+    cx.fillStyle='#4a443c';rr(x-9,y+2,18,8,2,'#4a443c');
+    cx.fillStyle='#8a8276';rr(x-12,y-2,24,3,1,'#8a8276');
+    cx.save();cx.globalCompositeOperation='lighter';cx.fillStyle='rgba(255,230,120,.5)';cx.beginPath();cx.arc(x,y-16+b,12,0,7);cx.fill();cx.restore();
+    cx.fillStyle='#ffe070';cx.beginPath();cx.moveTo(x,y-24+b);cx.lineTo(x+6,y-16+b);cx.lineTo(x,y-8+b);cx.lineTo(x-6,y-16+b);cx.closePath();cx.fill(); // gema
+    cx.fillStyle='#fff7d0';cx.beginPath();cx.moveTo(x,y-22+b);cx.lineTo(x+3,y-16+b);cx.lineTo(x,y-12+b);cx.lineTo(x-3,y-16+b);cx.closePath();cx.fill();
+  }
   // mobs (sprites con dirección y animación)
   mobs.forEach(m=>drawMob(m));
   // boss: Rey de Piedra — coloso pétreo coronado de calaveras
@@ -1961,7 +1989,8 @@ function updateHUD(){
   const ap=G.armor?Math.round(G.armor.dur/G.armor.maxDur*100)+'%':'—';
   document.getElementById('gear-tag').innerHTML=
     '⚔'+(G.weapon?G.weapon.name+' '+wp:'sin arma')+
-    ' · ⛨'+(G.armor?ap:'—')+' · ⚗'+G.potions;
+    ' · ⛨'+(G.armor?ap:'—')+' · ⚗'+G.potions+
+    (G.relics.size?' · ✦'+G.relics.size:'');
   skillBtn.classList.toggle('cooldown',G.skillCD>0);
   // botón volver al pueblo solo en la cueva
   document.getElementById('btn-town').style.display = G.scene==='dungeon'?'block':'none';
@@ -1979,13 +2008,34 @@ function showToast(title,body){
   toastT=setTimeout(()=>t.classList.remove('show'),2600);
 }
 
+// ---------- guardián vencido -> objeto sagrado ----------
+function defeatBoss(){
+  const bx=boss?boss.x:(MAP_W/2)*TILE;
+  if(boss)boss.alive=false; boss=null;
+  for(let i=0;i<24;i++)particles.push({type:'spark',x:bx,y:(MAP_H-4)*TILE,dx:(Math.random()-.5)*5,dy:(Math.random()-.5)*5,life:26,col:'#e8c547'});
+  const relic=RELICS[G.caveName]||RELICS['CUEVA DEL TEMPLO'];
+  if(G.relics.has(relic.id)){ winGame(relic,true); return; }   // ya reclamada
+  altar={x:bx, y:(MAP_H-2)*TILE-14, relic, t:0};
+  showToast('¡EL GUARDIÁN CAE!','Una luz se alza del fondo...<br>el OBJETO SAGRADO te espera.');
+}
+function claimRelic(r){
+  altar=null;
+  if(!G.relics.has(r.id)){ G.relics.add(r.id); r.apply(); recalcStats(); G.hp=G.maxhp; }
+  winGame(r,false);
+}
 // ---------- win ----------
-function winGame(){
+function winGame(relic,already){
   if(boss)boss.alive=false;
   G.running=false;G.gold+=200;
   wearEquipment(40); // el jefe desgasta fuerte el equipo
-  document.getElementById('win-text').innerHTML='<span style="color:var(--gold)">El Rey de Piedra cae.</span> El dios que ahogó a Tenoch durante siglos se hace polvo.<br><br>De entre los escombros de su trono tomas la <span style="color:var(--gold)">RELIQUIA SAGRADA</span> — la fuente de su poder, ahora tuya. El pueblo es libre, y ya no eres el extraño débil que llegó: eres quien mató a un dios.<br><br>Pero la reliquia no es la única. Hay otras, repartidas por el mundo, cada una en manos de un dios... y ahora lo sabes.';
+  const rn=relic?relic.name:'RELIQUIA SAGRADA', rd=relic?(' — '+relic.desc):'';
+  document.getElementById('win-text').innerHTML=
+    '<span style="color:var(--gold)">El guardián cae.</span> El dios que ahogó a Tenoch se hace polvo.<br><br>'+
+    'De entre los escombros tomas <span style="color:var(--gold)">'+rn+'</span>'+rd+', un OBJETO SAGRADO que ahora es tuyo. '+
+    (already?'(Ya poseías su poder.)':'Su fuerza antigua corre por tus venas: eres más fuerte para siempre.')+
+    '<br><br>Hay más reliquias en el mundo, cada una en manos de un dios... y ahora lo sabes.';
   document.getElementById('win-screen').style.display='flex';
+  saveGame();
 }
 
 // ============ PANELES: prompt, tienda, NPC ============
@@ -2217,7 +2267,7 @@ function saveGame(){
   savedGame={classes:[...G.classes],resp:G.resp,respMax:G.respMax,
     respLevel:G.respLevel,gold:G.gold,seen:[...G.seen],cluesFound:G.cluesFound,
     weapon:G.weapon?{...G.weapon}:null,armor:G.armor?{...G.armor}:null,potions:G.potions,
-    powers:[...G.powers],lifesteal:G.lifesteal||0,speed:G.speed,atkSpeed:G.atkSpeed,
+    powers:[...G.powers],relics:[...G.relics],goldMult:G.goldMult,lifesteal:G.lifesteal||0,speed:G.speed,atkSpeed:G.atkSpeed,
     baseMaxhp:G.baseMaxhp,baseDmg:G.baseDmg,baseDef:G.baseDef};
   refreshContinue();
 }
@@ -2231,6 +2281,8 @@ function loadGame(){
   G.armor=savedGame.armor?{...savedGame.armor}:null;
   G.potions=savedGame.potions||0;
   G.powers=new Set(savedGame.powers||[]);
+  G.relics=new Set(savedGame.relics||[]);
+  if(savedGame.goldMult)G.goldMult=savedGame.goldMult;
   if(savedGame.lifesteal!==undefined)G.lifesteal=savedGame.lifesteal;
   if(savedGame.speed)G.speed=savedGame.speed;
   if(savedGame.atkSpeed)G.atkSpeed=savedGame.atkSpeed;
