@@ -62,11 +62,12 @@ fuerte Y te revela secretos. Esto justifica narrativamente la mecánica de progr
 ### Escenas (dos modos de juego en uno)
 El juego tiene **dos vistas distintas** según `G.scene`:
 
-**VILLA DE TENOCH (`'town'`) — vista cenital (top-down), mundo abierto:**
-- Mapa **generado por código** en `buildTown()` (24×30, cámara que recorre). `TOWN_ART` y `TOWN_INFO` se llenan ahí; `buildingAt()` consulta `TOWN_INFO["x,y"]`.
-- Plaza central con fuente, 6 edificios (ARMERÍA/Ataque · ARMADURÍA/Defensa · BOTICA/Pociones · SANTUARIO/Potenciadores · TÓTEM/Encantamiento · HERRERÍA/Reparar) + 2 NPCs (Anciano, Mercader) con consejos y pista de objeto sagrado.
-- Tiendas nuevas: `SHOP_POWERS` (mejoras permanentes a stats base, una vez c/u, en `G.powers`) y `SHOP_ENCHANTS` (modifican el arma/armadura equipada). `renderShop`/`buyItem` manejan los kinds `powerups` y `enchant`.
-- Movimiento en 4 direcciones, sin gravedad ni combate. Colisión vía `solid()` usando `SOLID_TYPES`. La hierba es transitable (caminos cosméticos).
+**MUNDO DE TENOCH (`'town'`) — vista cenital (top-down), overworld abierto (principio tipo Kanto):**
+- Mapa **generado por código** en `buildTown()` (44×40, cámara que recorre). Base de **bosque (árboles sólidos)**; las **rutas-corredor** y los **claros/regiones** se tallan como hierba transitable. `TOWN_ART`/`TOWN_INFO` se llenan ahí; `buildingAt()` consulta `TOWN_INFO["x,y"]`.
+- **Villa de Tenoch** (hub, sur): plaza con fuente, 6 edificios (ARMERÍA/Ataque · ARMADURÍA/Defensa · BOTICA/Pociones · SANTUARIO/Potenciadores · TÓTEM/Encantamiento · HERRERÍA/Reparar) + 2 NPCs (Anciano, Mercader) con consejos y pista del objeto sagrado.
+- **3 cuevas ya hechas y enterables** (`kind:'cave'`): CUEVA DEL TEMPLO (norte, jefe Cap. I), CUEVA DE JADE (oeste), GRUTA SOMBRÍA (este). Por ahora todas cargan el mismo `CAVE_ART`; `enterDungeon(full,name)` setea el nombre mostrado. **Escalado a 10 capítulos:** la idea es parametrizar `buildTown` por región/capítulo y conectar regiones por bordes.
+- Tiendas nuevas: `SHOP_POWERS` (mejoras permanentes a stats base, en `G.powers`) y `SHOP_ENCHANTS` (modifican el arma/armadura equipada). `renderShop`/`buyItem` manejan los kinds `powerups` y `enchant`.
+- Movimiento en 4 direcciones, sin gravedad ni combate. Colisión vía `solid()`/`SOLID_TYPES`. Hierba y caminos transitables; árboles/agua/edificios bloquean.
 
 **CUEVA (`'dungeon'`) — vista lateral tipo plataformas (estilo Metal Slug en mecánica):**
 - Mapa `CAVE_ART` (40×20, ancho). Avanzas a la derecha.

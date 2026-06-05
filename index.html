@@ -625,51 +625,65 @@ const CAVE_ART=[
 ];
 const CAVE_W=40, CAVE_H=20;
 
-// ===== VILLA DE TENOCH (mundo abierto, generado) =====
-// chars: G hierba · T árbol · P camino · F flor · S piedra · H pared · D puerta · R tejado · N npc · C cueva · W agua(fuente)
+// ===== MUNDO DE TENOCH (overworld abierto, generado — principio tipo Kanto) =====
+// Bosque (árboles) como base; las RUTAS y CLAROS se tallan como hierba transitable.
+// chars: G hierba · T árbol · P camino · F flor · S piedra · H pared · D puerta · R tejado · N npc · C cueva · W agua
 let TOWN_ART=[];
 let TOWN_INFO={};            // "x,y" -> {kind:'shop'|'cave'|'npc', ...}
-const TOWN_W=24, TOWN_H=30;
+const TOWN_W=44, TOWN_H=40;
 function buildTown(){
   const W=TOWN_W,H=TOWN_H;
-  const g=[]; for(let y=0;y<H;y++){const row=[];for(let x=0;x<W;x++)row.push('G');g.push(row);}
+  const g=[]; for(let y=0;y<H;y++){const row=[];for(let x=0;x<W;x++)row.push('T');g.push(row);}
   TOWN_INFO={};
-  const set=(x,y,c)=>{ if(x>=0&&x<W&&y>=0&&y<H)g[y][x]=c; };
-  const walk=(x,y)=>{const c=g[y]&&g[y][x]; return c==='G'||c==='F';}; // solo decorar sobre hierba
-  const hpath=(x1,x2,y)=>{ for(let x=Math.min(x1,x2);x<=Math.max(x1,x2);x++) if(walk(x,y))set(x,y,'P'); };
-  const vpath=(y1,y2,x)=>{ for(let y=Math.min(y1,y2);y<=Math.max(y1,y2);y++) if(walk(x,y))set(x,y,'P'); };
-  // borde de árboles
-  for(let y=0;y<H;y++)for(let x=0;x<W;x++) if(x<2||x>=W-2||y<2||y>=H-2) g[y][x]='T';
-  // plaza central de piedra con fuente
-  for(let y=12;y<=16;y++)for(let x=9;x<=15;x++)set(x,y,'S');
-  set(12,14,'W');set(11,14,'W');set(12,13,'W');
-  // edificio 3x4 (RRR/RHR/RDR/SSS), puerta en (bx+1,by+2)
+  const inb=(x,y)=>x>=0&&x<W&&y>=0&&y<H;
+  const set=(x,y,c)=>{ if(inb(x,y))g[y][x]=c; };
+  const get=(x,y)=>inb(x,y)?g[y][x]:'T';
+  const carve=(x1,y1,x2,y2,c)=>{ c=c||'G'; for(let y=y1;y<=y2;y++)for(let x=x1;x<=x2;x++)set(x,y,c); };
+  const road=(x1,y1,x2,y2)=>{ // camino en L cosmético sobre hierba
+    for(let x=Math.min(x1,x2);x<=Math.max(x1,x2);x++) if(get(x,y1)==='G')set(x,y1,'P');
+    for(let y=Math.min(y1,y2);y<=Math.max(y1,y2);y++) if(get(x2,y)==='G')set(x2,y,'P'); };
+  // ----- CLAROS / REGIONES -----
+  carve(14,26,33,37);   // Villa de Tenoch (sur, hub)
+  carve(17,14,28,24);   // Encrucijada central
+  carve(17,4,28,11);    // Claro del Templo (norte)
+  carve(3,12,12,20);    // Claro oeste (Cueva de Jade)
+  carve(31,12,40,20);   // Claro este (Gruta Sombría)
+  // ----- CORREDORES (rutas) que conectan los claros -----
+  carve(21,24,25,26);   // villa <-> encrucijada
+  carve(21,11,25,14);   // encrucijada <-> templo
+  carve(12,16,17,18);   // encrucijada <-> oeste
+  carve(28,16,31,18);   // encrucijada <-> este
+  // ----- AGUA (lago, barrera natural / escenario) -----
+  carve(4,30,12,37,'W');
+  // ----- VILLA: plaza con fuente, 6 edificios, nativos -----
+  carve(20,29,27,33,'S');
+  set(23,31,'W');set(22,31,'W');set(23,30,'W'); // fuente
   function building(bx,by,kind,name){
     set(bx,by,'R');set(bx+1,by,'R');set(bx+2,by,'R');
     set(bx,by+1,'R');set(bx+1,by+1,'H');set(bx+2,by+1,'R');
     set(bx,by+2,'R');set(bx+1,by+2,'D');set(bx+2,by+2,'R');
     set(bx,by+3,'S');set(bx+1,by+3,'S');set(bx+2,by+3,'S');
-    TOWN_INFO[(bx+1)+','+(by+2)]=(kind==='cave')?{kind:'cave',name}:{kind:'shop',shop:kind,name};
+    TOWN_INFO[(bx+1)+','+(by+2)]={kind:'shop',shop:kind,name};
   }
+  building(15,26,'weapons','ARMERÍA · Ataque');
+  building(28,26,'potions','BOTICA · Pociones');
+  building(15,31,'armors','ARMADURÍA · Defensa');
+  building(28,31,'powerups','SANTUARIO · Potenciadores');
+  building(16,34,'enchant','TÓTEM · Encantamiento');
+  building(25,34,'repair','HERRERÍA · Reparar');
   function npc(x,y,role,name,text){ set(x,y,'N'); TOWN_INFO[x+','+y]={kind:'npc',role,name,text}; }
-  // 6 edificios alrededor de la plaza
-  building(3,7,'weapons','ARMERÍA · Ataque');
-  building(3,17,'armors','ARMADURÍA · Defensa');
-  building(18,7,'potions','BOTICA · Pociones');
-  building(18,17,'powerups','SANTUARIO · Potenciadores');
-  building(8,23,'enchant','TÓTEM · Encantamiento');
-  building(13,23,'repair','HERRERÍA · Reparar');
-  // caminos: avenida central, cruz este-oeste y cabos a cada puerta (cosméticos)
-  vpath(4,27,12); hpath(3,20,14);
-  vpath(10,14,4); vpath(14,20,4); vpath(10,14,19); vpath(14,20,19);
-  vpath(16,26,9); vpath(16,26,14);
-  // entrada del templo (cueva) arriba al centro
-  set(12,3,'C'); set(12,4,'S'); TOWN_INFO['12,3']={kind:'cave',name:'CUEVA DEL TEMPLO'};
-  // nativos junto a la plaza (consejos + pista de objeto sagrado)
-  npc(10,11,'anciano','Anciano de Tenoch','El Rey de Piedra nos ahoga desde su sueño bajo el templo. Hazte fuerte antes de bajar y combina bien tus dones: el ASESINO junto al MAGO castiga de lejos y de cerca; el TANQUE con cualquiera te mantiene en pie. Y oye: bajo el guardián del fondo duerme un OBJETO SAGRADO. Quien lo toca, despierta una fuerza antigua.');
-  npc(14,11,'mercader','Mercader','Cada bestia que matas deja oro. Gástalo: arma en la ARMERÍA, cuero en la ARMADURÍA, y cuando puedas pásate por el TÓTEM a ENCANTAR tu equipo. Los POTENCIADORES del santuario son para siempre. ¿Un consejo? Encanta el arma con Sed de Vida y no caerás fácil.');
-  // decoración: flores sueltas sobre hierba
-  [[5,5],[19,5],[5,27],[19,27],[7,13],[16,13],[6,20],[17,11]].forEach(([x,y])=>{ if(walk(x,y))set(x,y,'F'); });
+  npc(21,28,'anciano','Anciano de Tenoch','El Rey de Piedra nos ahoga desde su sueño bajo el templo. Hazte fuerte antes de bajar y combina bien tus dones: el ASESINO junto al MAGO castiga de lejos y de cerca; el TANQUE con cualquiera te mantiene en pie. Y oye: bajo el guardián del fondo duerme un OBJETO SAGRADO. Quien lo toca, despierta una fuerza antigua.');
+  npc(26,28,'mercader','Mercader','Cada bestia que matas deja oro. Gástalo: arma en la ARMERÍA, cuero en la ARMADURÍA, y cuando puedas pásate por el TÓTEM a ENCANTAR tu equipo. Los POTENCIADORES del santuario son para siempre. Tres bocas de cueva rodean Tenoch: empieza por la del norte, bajo el templo.');
+  // ----- CUEVAS (ya hechas y enterables) -----
+  function cave(x,y,name){ set(x,y,'C'); set(x,y+1,'S'); TOWN_INFO[x+','+y]={kind:'cave',name}; }
+  cave(22,5,'CUEVA DEL TEMPLO');   // norte (jefe del Cap. I)
+  cave(6,15,'CUEVA DE JADE');      // oeste
+  cave(37,15,'GRUTA SOMBRÍA');     // este
+  // ----- caminos cosméticos -----
+  road(23,33,23,25); road(23,25,23,12); road(23,12,22,6);   // avenida central villa->templo
+  road(17,17,12,17); road(28,17,31,17);                     // rutas oeste/este
+  // ----- decoración: flores en los claros -----
+  [[19,16],[26,22],[8,18],[35,18],[20,7],[30,28],[18,30],[24,22]].forEach(([x,y])=>{ if(get(x,y)==='G')set(x,y,'F'); });
   TOWN_ART=g.map(r=>r.join(''));
 }
 
@@ -724,8 +738,9 @@ function spawnMob(type,tx,ty){
 }
 function spawnClue(tx,ty){clues.push({x:tx*TILE+16,y:ty*TILE+16,taken:false,bob:Math.random()*6});}
 
-function enterDungeon(full){
+function enterDungeon(full,name){
   G.scene='dungeon';
+  G.caveName=name||'CUEVA DEL TEMPLO';
   buildMap();
   mobs=[];clues=[];particles=[];boss=null;
   G.bossSpawned=false;
@@ -746,7 +761,7 @@ function enterDungeon(full){
   // jugador entra por la izquierda, cae al suelo
   G.px=3*TILE+16;G.py=16*TILE; G.vy=0;G.grounded=false;
   G.hp=G.maxhp;G.alive=true;G.iframes=40;
-  document.getElementById('chapter').textContent='CUEVA DEL TEMPLO';
+  document.getElementById('chapter').textContent=G.caveName;
   G.near=null;hideAllPanels();updateHUD();
   if(!G.godWarned){ G.godWarned=true; showGodModal(); }
 }
@@ -754,7 +769,7 @@ function enterTown(){
   G.scene='town';
   buildMap();
   mobs=[];clues=[];particles=[];boss=null;
-  G.px=12*TILE+16;G.py=18*TILE+16;    // avenida central, bajo la plaza
+  G.px=23*TILE+16;G.py=35*TILE+16;    // avenida de la villa, bajo la plaza
   G.hp=G.maxhp;G.alive=true;G.iframes=20;G.near=null;
   document.getElementById('chapter').textContent='VILLA DE TENOCH';
   hideAllPanels();updateHUD();
@@ -1946,7 +1961,7 @@ function showPrompt(b){
 document.getElementById('prompt-skip').addEventListener('click',()=>{hidePrompt();});
 document.getElementById('prompt-enter').addEventListener('click',()=>{
   const b=G.near; if(!b)return; hidePrompt();
-  if(b.kind==='cave'){ G.running=true; enterDungeon(true); }
+  if(b.kind==='cave'){ G.running=true; enterDungeon(true, b.name); }
   else if(b.kind==='npc'){ openNPC(b); }
   else if(b.kind==='shop'){
     if(b.shop==='repair')openRepair(); else openShop(b.shop,b.name);
