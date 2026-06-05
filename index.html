@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Guía oficial de Reliquia: historia, items, combinaciones, villanos, mapa y actualizaciones del juego." />
+  <title>Reliquia · Guía Oficial del Juego</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <!-- ===== NAVBAR ===== -->
+  <header class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a href="#inicio" class="brand">
+        <span class="brand-mark">◆</span>
+        <span class="brand-text">RELIQUIA</span>
+      </a>
+
+      <button class="nav-toggle" id="navToggle" aria-label="Abrir menú" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+
+      <nav class="nav-links" id="navLinks">
+        <a href="#historia">Historia</a>
+        <a href="#items">Items</a>
+        <a href="#combinaciones">Combinaciones</a>
+        <a href="#villanos">Villanos</a>
+        <a href="#mapa">Mapa</a>
+        <a href="#actualizaciones">Actualizaciones</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== HERO / ¿QUÉ ES EL JUEGO? ===== -->
+  <section class="hero" id="inicio">
+    <div class="hero-bg"></div>
+    <div class="hero-content">
+      <p class="hero-kicker">Guía oficial del juego</p>
+      <h1 class="hero-title">RELIQUIA</h1>
+      <p class="hero-sub">
+        Un RPG de acción donde reúnes reliquias ancestrales, fusionas items legendarios
+        y derrotas villanos cada vez más poderosos… hasta enfrentarte a los
+        <strong>Dioses</strong>, los jefes finales de cada capítulo.
+      </p>
+      <div class="hero-cta">
+        <a href="#historia" class="btn btn-primary">Empezar la guía</a>
+        <a href="#villanos" class="btn btn-ghost">Ver villanos</a>
+      </div>
+
+      <div class="hero-stats">
+        <div class="stat"><span class="stat-num" data-count="48">0</span><span class="stat-label">Items</span></div>
+        <div class="stat"><span class="stat-num" data-count="30">0</span><span class="stat-label">Combinaciones</span></div>
+        <div class="stat"><span class="stat-num" data-count="7">0</span><span class="stat-label">Dioses</span></div>
+        <div class="stat"><span class="stat-num" data-count="12">0</span><span class="stat-label">Regiones</span></div>
+      </div>
+    </div>
+    <a href="#explicacion" class="scroll-hint" aria-label="Desplázate hacia abajo">▼</a>
+  </section>
+
+  <!-- ===== EXPLICACIÓN VISUAL ===== -->
+  <section class="section explain" id="explicacion">
+    <div class="section-head">
+      <h2 class="section-title">¿Qué es Reliquia?</h2>
+      <p class="section-desc">Tres pilares que definen tu aventura.</p>
+    </div>
+    <div class="explain-grid">
+      <article class="explain-card">
+        <div class="explain-icon">⚔️</div>
+        <h3>Explora y combate</h3>
+        <p>Recorre 12 regiones llenas de enemigos. Cada capítulo culmina con un Dios como jefe final.</p>
+      </article>
+      <article class="explain-card">
+        <div class="explain-icon">🔮</div>
+        <h3>Reúne reliquias</h3>
+        <p>Descubre items raros repartidos por el mundo y desbloquea su poder oculto.</p>
+      </article>
+      <article class="explain-card">
+        <div class="explain-icon">🛠️</div>
+        <h3>Combina y crea</h3>
+        <p>Fusiona items siguiendo recetas para forjar equipo legendario único.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ===== HISTORIA ===== -->
+  <section class="section" id="historia">
+    <div class="section-head">
+      <h2 class="section-title">Historia</h2>
+      <p class="section-desc">La leyenda detrás de las reliquias.</p>
+    </div>
+    <div class="lore">
+      <p class="lore-lead">
+        Hace eones, los <strong>Dioses</strong> sellaron su poder en reliquias dispersas por el mundo.
+        Quien las reúna podrá reescribir el destino… o condenarlo.
+      </p>
+      <div class="timeline" id="timeline"><!-- generado por JS --></div>
+    </div>
+  </section>
+
+  <!-- ===== ITEMS ===== -->
+  <section class="section" id="items">
+    <div class="section-head">
+      <h2 class="section-title">Todos los Items</h2>
+      <p class="section-desc">Filtra por categoría o rareza para encontrar lo que buscas.</p>
+    </div>
+
+    <div class="toolbar">
+      <input type="search" id="itemSearch" class="search-input" placeholder="Buscar item…" aria-label="Buscar item" />
+      <div class="filters" id="itemFilters"><!-- chips por JS --></div>
+    </div>
+
+    <div class="card-grid" id="itemsGrid"><!-- generado por JS --></div>
+    <p class="empty-state" id="itemsEmpty" hidden>No se encontraron items con ese filtro.</p>
+  </section>
+
+  <!-- ===== COMBINACIONES ===== -->
+  <section class="section" id="combinaciones">
+    <div class="section-head">
+      <h2 class="section-title">Guías de Combinación</h2>
+      <p class="section-desc">Recetas para fusionar items y forjar equipo legendario.</p>
+    </div>
+    <div class="recipes" id="recipesList"><!-- generado por JS --></div>
+  </section>
+
+  <!-- ===== VILLANOS ===== -->
+  <section class="section" id="villanos">
+    <div class="section-head">
+      <h2 class="section-title">Villanos</h2>
+      <p class="section-desc">Desde los más débiles hasta los Dioses, jefes finales de cada capítulo.</p>
+    </div>
+    <div class="tier-legend" id="tierLegend"><!-- por JS --></div>
+    <div class="villains" id="villainsList"><!-- generado por JS --></div>
+  </section>
+
+  <!-- ===== MAPA ===== -->
+  <section class="section" id="mapa">
+    <div class="section-head">
+      <h2 class="section-title">Mapa del Mundo</h2>
+      <p class="section-desc">Pasa el cursor sobre cada región para ver detalles.</p>
+    </div>
+    <div class="map-wrap">
+      <div class="map" id="map"><!-- regiones por JS --></div>
+      <aside class="map-info" id="mapInfo">
+        <h3 id="mapInfoName">Selecciona una región</h3>
+        <p id="mapInfoDesc">Pasa el cursor o toca un punto del mapa para ver su información.</p>
+        <span class="map-info-tag" id="mapInfoTag" hidden></span>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ===== ACTUALIZACIONES / PROMOCIONES ===== -->
+  <section class="section" id="actualizaciones">
+    <div class="section-head">
+      <h2 class="section-title">Actualizaciones y Promociones</h2>
+      <p class="section-desc">Las últimas novedades del juego.</p>
+    </div>
+    <div class="news" id="newsList"><!-- generado por JS --></div>
+  </section>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <span class="brand"><span class="brand-mark">◆</span> RELIQUIA</span>
+      <p>Guía no oficial creada por la comunidad. © <span id="year"></span> Reliquia.</p>
+      <nav class="footer-links">
+        <a href="#historia">Historia</a>
+        <a href="#items">Items</a>
+        <a href="#villanos">Villanos</a>
+        <a href="#mapa">Mapa</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script src="js/data.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
