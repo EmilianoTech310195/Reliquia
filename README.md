@@ -78,6 +78,9 @@ El juego tiene **dos vistas distintas** según `G.scene`:
 - Enemigos terrestres (baba/reptil/araña/guardián) tienen gravedad; **espectros y murciélagos vuelan** (flag `flying` en `MOB_TYPES`). El murciélago aletea errático en vertical.
 - Jefe (Rey de Piedra) aparece al fondo derecha, persigue horizontal con gravedad, lanza rocas en abanico (ataque telegrafiado con aro de carga).
 - **Objetos sagrados (HITO 3):** al vencer al guardián del fondo (`defeatBoss`) se alza un **altar** (`altar`) con la reliquia de esa cueva (`RELICS[caveName]`); tocarlo (`claimRelic`) otorga un **poder permanente único** (`G.relics`, persistido). Templo→Corazón de Obsidiana, Jade→Ojo de Jade, Gruta→Garra Sombría. El HUD muestra `✦` con la cantidad.
+- **Cofres** (`chests`): ~60% de niveles tienen uno; al tocarlo da oro + chance de poción/equipo (`openChest`).
+- **Temas de cueva** (`CAVE_THEMES`, en `G.caveTheme`): cada cueva tiene atmósfera (tinte en `applyZoneTint`), guardián con nombre y color de ojos/grietas/aura, y **sesgo de enemigos** (`genCave(level,bias)`). Templo=ámbar, Jade=verde, Gruta=violeta.
+- **Audio** (`playSfx`/`startMusic`, WebAudio sintetizado, sin archivos): SFX de acciones + música ambiente por escena; toggle con tecla M.
 
 ### Mapas y tiles
 - `CHAR2TYPE` mapea caracteres del arte ASCII a tipos numéricos.

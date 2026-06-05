@@ -577,6 +577,12 @@ const RELICS={
   'GRUTA SOMBRÍA':{id:'r_gruta',name:'Garra Sombría',desc:'+vel. de ataque · +2 defensa',
     apply(){G.atkSpeed=Math.max(4,G.atkSpeed-3);G.baseDef+=2;}},
 };
+// tema visual/jugable por cueva (atmósfera, guardián, sesgo de enemigos)
+const CAVE_THEMES={
+  'CUEVA DEL TEMPLO':{tint:[60,30,15],  accent:'#ff7a2a', glow:[255,150,40], bossName:'REY DE PIEDRA',   bias:null},
+  'CUEVA DE JADE':   {tint:[20,55,38],  accent:'#3fe0a0', glow:[80,230,150], bossName:'GUARDIÁN DE JADE', bias:['reptil','arana']},
+  'GRUTA SOMBRÍA':   {tint:[42,22,58],  accent:'#b070ff', glow:[150,90,255], bossName:'GUARDIÁN SOMBRÍO',bias:['espectro','murcielago']},
+};
 
 // ---------- mundo: mapa de tiles 16-bit (bosque y río) ----------
 // tipos: 0=hierba  1=árbol(sólido)  2=agua(sólido)  3=camino tierra  4=arbusto(sólido)  5=flores(hierba)
@@ -770,7 +776,7 @@ function spawnClue(tx,ty){clues.push({x:tx*TILE+16,y:ty*TILE+16,taken:false,bob:
 
 // ---------- niveles de cueva (generados, escalados por dificultad) ----------
 function lrng(seed){ let s=(seed*2654435761)>>>0||1; return ()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
-function genCave(level){
+function genCave(level,bias){
   const rnd=lrng(level*97+13);
   const W=Math.min(40+level*2,60), H=20;
   const g=[]; for(let y=0;y<H;y++){const r=[];for(let x=0;x<W;x++)r.push('.');g.push(r);}
@@ -787,6 +793,7 @@ function genCave(level){
   const spawns=[], pool=['baba','reptil'];
   if(level>=3)pool.push('arana'); if(level>=4)pool.push('espectro');
   if(level>=6)pool.push('murcielago'); if(level>=8)pool.push('guardian');
+  if(bias)bias.forEach(t=>{ if(pool.includes(t)){pool.push(t);pool.push(t);} }); // sesgo del tema
   const count=Math.min(4+level,14);
   for(let i=0;i<count;i++){ const type=pool[Math.floor(rnd()*pool.length)];
     const fly=(type==='espectro'||type==='murcielago');
@@ -812,7 +819,7 @@ function loadLevel(){
     G.hp=G.maxhp;G.alive=true;G.iframes=40;G.near=null;
     spawnBoss();
   } else {
-    const lv=genCave(G.level); curCaveArt=lv.art; buildMap();
+    const lv=genCave(G.level, G.caveTheme&&G.caveTheme.bias); curCaveArt=lv.art; buildMap();
     lv.spawns.forEach(s=>spawnMob(s.type,s.tx,s.ty,G.level));
     chests=(lv.chests||[]).map(c=>({x:c.tx*TILE+16, y:(lv.H-2)*TILE-10, open:false}));
     portal={x:lv.exitTx*TILE+16, y:(lv.H-2)*TILE-12, t:0};
@@ -845,6 +852,7 @@ function advanceLevel(){
 function enterDungeon(full,name){
   G.scene='dungeon';
   G.caveName=name||'CUEVA DEL TEMPLO';
+  G.caveTheme=CAVE_THEMES[G.caveName]||CAVE_THEMES['CUEVA DEL TEMPLO'];
   if(full) G.level=1;
   loadLevel();
   if(!G.godWarned){ G.godWarned=true; showGodModal(); }
@@ -1230,9 +1238,11 @@ function update(){
 
 function spawnBoss(){
   G.bossSpawned=true;
-  // el Rey de Piedra aparece al fondo de la arena (derecha), sobre el suelo
+  // el guardián de la cueva aparece al fondo de la arena (derecha), sobre el suelo
   boss={alive:true,x:(MAP_W-8)*TILE,y:(MAP_H-6)*TILE,hp:240,maxhp:240,dmg:9,sp:1.0,r:26,hit:0,atkT:90,vy:0};
-  document.getElementById('chapter').textContent='⚠ REY DE PIEDRA';
+  const bn=(G.caveTheme&&G.caveTheme.bossName)||'REY DE PIEDRA';
+  document.getElementById('chapter').textContent='⚠ '+bn;
+  const bt=document.getElementById('boss-title'); if(bt)bt.textContent=bn;
   showBossIntro();
 }
 // pantalla de presentación del jefe (~3.5s, pausa el juego)
@@ -1935,6 +1945,7 @@ function render(){
   // boss: Rey de Piedra — coloso pétreo coronado de calaveras
   if(boss&&boss.alive){
     const R=boss.r,fl=boss.hit>0,ch=boss.charge||0;
+    const acc=(G.caveTheme&&G.caveTheme.accent)||'#ff7a2a';  // color del guardián según la cueva
     const sh=ch>0?(Math.random()-0.5)*ch*3:0, shv=ch>0?(Math.random()-0.5)*ch*2:0;
     const bx=boss.x+sh,by=boss.y+shv;                  // tiembla mientras carga
     const S=c=>fl?'#fff':c;
@@ -1968,7 +1979,7 @@ function render(){
     cx.fillStyle=S('#26261f');
     cx.beginPath();cx.ellipse(bx-9,hy+1,5,4,0,0,7);cx.fill();cx.beginPath();cx.ellipse(bx+9,hy+1,5,4,0,0,7);cx.fill();
     cx.save();cx.globalAlpha=eyeGlow;
-    cx.fillStyle='#ff7a2a';cx.beginPath();cx.arc(bx-9,hy+1,3.2+ch*1.6,0,7);cx.fill();cx.beginPath();cx.arc(bx+9,hy+1,3.2+ch*1.6,0,7);cx.fill();
+    cx.fillStyle=acc;cx.beginPath();cx.arc(bx-9,hy+1,3.2+ch*1.6,0,7);cx.fill();cx.beginPath();cx.arc(bx+9,hy+1,3.2+ch*1.6,0,7);cx.fill();
     cx.fillStyle='#ffe070';cx.beginPath();cx.arc(bx-9,hy+1,1.4,0,7);cx.fill();cx.beginPath();cx.arc(bx+9,hy+1,1.4,0,7);cx.fill();
     cx.restore();
     // nariz angular
@@ -1986,13 +1997,13 @@ function render(){
       cx.fillStyle='#201f1a';cx.beginPath();cx.arc(sx-1.4,sy-.5,1,0,7);cx.fill();cx.beginPath();cx.arc(sx+1.4,sy-.5,1,0,7);cx.fill();
     }
     // ---- grietas que brillan (despertando) ----
-    cx.save();cx.globalAlpha=0.85;cx.strokeStyle='#ffae30';cx.lineWidth=1.6;
+    cx.save();cx.globalAlpha=0.85;cx.strokeStyle=acc;cx.lineWidth=1.6;
     cx.beginPath();cx.moveTo(bx-R+6,by+R-2);cx.lineTo(bx-8,by+8);cx.lineTo(bx-12,hy+18);cx.stroke();
     cx.beginPath();cx.moveTo(bx+R-4,by+10);cx.lineTo(bx+10,by+14);cx.stroke();
     cx.restore();
     // ---- aro de carga que se cierra: avisa el ataque ----
     if(ch>0){
-      cx.save();cx.globalAlpha=0.35+ch*0.5;cx.strokeStyle='#ffae30';cx.lineWidth=2+ch*2.5;
+      cx.save();cx.globalAlpha=0.35+ch*0.5;cx.strokeStyle=acc;cx.lineWidth=2+ch*2.5;
       cx.beginPath();cx.arc(boss.x,boss.y,R+22-ch*20,0,7);cx.stroke();cx.restore();
     }
   }
@@ -2031,8 +2042,9 @@ function render(){
     cx.fillStyle=lg;cx.beginPath();cx.arc(G.px,G.py,70,0,7);cx.fill();
   }
   if(boss&&boss.alive){
+    const gw=(G.caveTheme&&G.caveTheme.glow)||[255,150,40];
     const bg=cx.createRadialGradient(boss.x,boss.y,4,boss.x,boss.y,50);
-    bg.addColorStop(0,'rgba(255,150,40,.22)');bg.addColorStop(1,'rgba(255,150,40,0)');
+    bg.addColorStop(0,'rgba('+gw[0]+','+gw[1]+','+gw[2]+',.22)');bg.addColorStop(1,'rgba('+gw[0]+','+gw[1]+','+gw[2]+',0)');
     cx.fillStyle=bg;cx.beginPath();cx.arc(boss.x,boss.y,50,0,7);cx.fill();
   }
   cx.restore();
@@ -2062,8 +2074,9 @@ function applyZoneTint(){
     g.addColorStop(.45,'rgba(14,9,8,.30)');
     g.addColorStop(1,'rgba(6,4,6,.88)');
     cx.fillStyle=g;cx.fillRect(0,0,W,H);
-    // tinte cálido tenue (antorchas), no azul
-    cx.fillStyle='rgba(60,30,15,.12)';cx.fillRect(0,0,W,H);
+    // tinte de atmósfera según la cueva (Templo cálido / Jade verde / Gruta violeta)
+    const tn=(G.caveTheme&&G.caveTheme.tint)||[60,30,15];
+    cx.fillStyle='rgba('+tn[0]+','+tn[1]+','+tn[2]+',.14)';cx.fillRect(0,0,W,H);
     cx.restore();
   } else {
     // pueblo: calidez dorada suave + viñeta leve
