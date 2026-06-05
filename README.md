@@ -109,8 +109,10 @@ El juego tiene **dos vistas distintas** según `G.scene`:
 - **Presentación del jefe:** `showBossIntro()` — retrato del Rey de Piedra, nombre, barra que se llena, temblor; ~3.5s y empieza la pelea.
 
 ### Controles
-- Teclado: WASD/flechas mover; en cueva ↑/W salta; J golpe; K habilidad; L poción; C CRT.
-- Táctil: D-pad + botones GOLPE/HAB. En cueva, "arriba" del D-pad salta.
+- Teclado: WASD/flechas mover; en cueva ↑/W/Z/Espacio **saltan** (altura variable: soltar = salto corto); J golpe; K habilidad; L poción; C CRT.
+- Táctil: D-pad + botones **SALTO**/HAB/GOLPE (action-zone, visible solo en cueva). El "arriba" del D-pad también salta.
+- **Game feel de plataformas:** *coyote time* (~6f de gracia tras dejar el borde), *jump buffer* (~7f de pre-input), *altura variable* (cortar al soltar) y caída más rápida que el ascenso (salto con peso).
+- **Cámara:** sigue al jugador con suavizado (lerp 0.12) y *look-ahead* hacia donde avanza en la cueva; `camSnap` evita paneos largos al cambiar de escena/nivel.
 
 ---
 

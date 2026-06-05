@@ -113,6 +113,13 @@ body.no-crt #crt-overlay{display:none;}
 }
 #btn-skill:active{transform:scale(.92);}
 #btn-skill.cooldown{opacity:.4;}
+#btn-jump{
+  width:58px;height:58px;border-radius:50%;
+  background:#2f6b2a;border:3px solid var(--gb-light);
+  color:#eaffea;font-size:8px;display:flex;align-items:center;justify-content:center;
+  pointer-events:auto;user-select:none;text-align:center;
+}
+#btn-jump:active{transform:scale(.92);background:var(--gb-light);color:var(--gb-darkest);}
 
 /* ---------- Overlays ---------- */
 .overlay{
@@ -342,6 +349,7 @@ body.no-crt #crt-overlay{display:none;}
       <div class="dbtn" id="right" data-dir="right">▶</div>
     </div>
     <div id="action-zone">
+      <div id="btn-jump">SALTO</div>
       <div id="btn-skill">HAB.</div>
       <div id="btn-atk">GOLPE</div>
     </div>
@@ -486,6 +494,7 @@ cx.imageSmoothingEnabled=false;
 const W=320,H=576; // pantalla logica (canvas) - alta res para detalle 32-bit
 const TILE=32;
 const cam={x:0,y:0};
+let camSnap=true;          // saltar la cámara al destino al cambiar de escena/nivel
 
 // ---------- estado global ----------
 const G={
@@ -515,6 +524,7 @@ const G={
   near:null,               // edificio/NPC cercano para interactuar
   godWarned:false,         // si el dios ya advirtió al entrar a la cueva
   vy:0,grounded:false,gravity:0.7,jumpForce:13,  // física lateral en la cueva
+  coyote:0,jumpBuf:0,jumpPrev:false,jumping:false, // game feel de salto
 };
 
 // ---------- catálogo de tiendas ----------
@@ -793,7 +803,7 @@ function genArena(){ // sala del jefe (plana con esquive)
   return {art:g.map(r=>r.join('')), W, H};
 }
 function loadLevel(){
-  mobs=[];particles=[];boss=null;clues=[];portal=null;altar=null;G.bossSpawned=false;
+  mobs=[];particles=[];boss=null;clues=[];portal=null;altar=null;G.bossSpawned=false;camSnap=true;
   if(G.level>G.levelsTotal){                       // tras el nivel 15: el jefe
     const a=genArena(); curCaveArt=a.art; buildMap();
     G.px=3*TILE+16;G.py=(a.H-5)*TILE;G.vy=0;G.grounded=false;
@@ -829,7 +839,7 @@ function enterTown(){
   buildMap();
   mobs=[];clues=[];particles=[];boss=null;
   G.px=23*TILE+16;G.py=35*TILE+16;    // avenida de la villa, bajo la plaza
-  G.hp=G.maxhp;G.alive=true;G.iframes=20;G.near=null;
+  G.hp=G.maxhp;G.alive=true;G.iframes=20;G.near=null;camSnap=true;
   document.getElementById('chapter').textContent='VILLA DE TENOCH';
   hideAllPanels();updateHUD();
 }
@@ -859,12 +869,13 @@ function recalcStats(){
 
 // ---------- input ----------
 const keys={};
-addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;
-  if(e.key.toLowerCase()==='j')doAttack();
-  if(e.key.toLowerCase()==='k')doSkill();});
+addEventListener('keydown',e=>{const k=e.key.toLowerCase();keys[k]=true;
+  if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(k))e.preventDefault(); // no scrollear la página
+  if(k==='j')doAttack();
+  if(k==='k')doSkill();});
 addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
 
-const touchDir={up:0,down:0,left:0,right:0};
+const touchDir={up:0,down:0,left:0,right:0,jump:0};
 document.querySelectorAll('.dbtn').forEach(b=>{
   const d=b.dataset.dir;
   const on=e=>{e.preventDefault();touchDir[d]=1;};
@@ -873,6 +884,11 @@ document.querySelectorAll('.dbtn').forEach(b=>{
   b.addEventListener('touchcancel',off);b.addEventListener('mousedown',on);
   b.addEventListener('mouseup',off);b.addEventListener('mouseleave',off);
 });
+const jumpBtn=document.getElementById('btn-jump');
+{const on=e=>{e.preventDefault();touchDir.jump=1;}, off=e=>{e.preventDefault();touchDir.jump=0;};
+ jumpBtn.addEventListener('touchstart',on);jumpBtn.addEventListener('touchend',off);
+ jumpBtn.addEventListener('touchcancel',off);jumpBtn.addEventListener('mousedown',on);
+ jumpBtn.addEventListener('mouseup',off);jumpBtn.addEventListener('mouseleave',off);}
 const atkBtn=document.getElementById('btn-atk');
 atkBtn.addEventListener('touchstart',e=>{e.preventDefault();doAttack();});
 atkBtn.addEventListener('mousedown',e=>{e.preventDefault();doAttack();});
@@ -1008,26 +1024,27 @@ function update(){
   let mx=0;
   if(keys['arrowleft']||keys['a']||touchDir.left){mx=-1;G.dir='left';}
   else if(keys['arrowright']||keys['d']||touchDir.right){mx=1;G.dir='right';}
-  // saltar: flecha arriba / W / touchDir.up actúan como salto
-  if((keys['arrowup']||keys['w']||touchDir.up) && G.grounded){
-    G.vy=-G.jumpForce; G.grounded=false;
+  // ---- salto con coyote time, buffer de entrada y altura variable ----
+  const jumpHeld = !!(keys['arrowup']||keys['w']||keys['z']||keys[' ']||touchDir.up||touchDir.jump);
+  const jumpPressed = jumpHeld && !G.jumpPrev; G.jumpPrev=jumpHeld;
+  if(G.grounded) G.coyote=6; else if(G.coyote>0) G.coyote--;       // gracia tras dejar el borde
+  if(jumpPressed) G.jumpBuf=7; else if(G.jumpBuf>0) G.jumpBuf--;   // pre-buffer del salto
+  if(G.jumpBuf>0 && (G.grounded||G.coyote>0)){
+    G.vy=-G.jumpForce; G.grounded=false; G.coyote=0; G.jumpBuf=0; G.jumping=true;
   }
+  if(!jumpHeld && G.jumping && G.vy<0){ G.vy*=0.45; G.jumping=false; } // soltar = salto corto
+  if(G.vy>=0) G.jumping=false;
   // mover horizontal con colisión
   let nx=G.px+mx*G.speed;
   if(!solidSide(nx,G.py)) G.px=nx;
-  // gravedad
-  G.vy+=G.gravity;
-  if(G.vy>12)G.vy=12;
+  // gravedad (cae más rápido que sube -> salto con peso, menos flotante)
+  G.vy += G.gravity * (G.vy>0?1.35:1);
+  if(G.vy>13)G.vy=13;
   let ny=G.py+G.vy;
   if(!solidSide(G.px,ny+9)){ // 9 = mitad alto del jugador (pies)
     G.py=ny; G.grounded=false;
   } else {
-    // aterrizó: ajustar a la superficie
-    if(G.vy>0){
-      const ty=Math.floor((ny+9)/TILE);
-      G.py=ty*TILE-9;
-      G.grounded=true;
-    }
+    if(G.vy>0){ const ty=Math.floor((ny+9)/TILE); G.py=ty*TILE-9; G.grounded=true; }
     G.vy=0;
   }
   // animación
@@ -1749,9 +1766,12 @@ function cellRnd(x,y,s){let n=(x*374761393+y*668265263+s*982451653)>>>0;n=(n^(n>
 function render(){
   if(!walls.length){cx.fillStyle='#1a3a1a';cx.fillRect(0,0,W,H);return;}
   waterFrame++;
-  // cámara centrada en el jugador, con límites del mapa
-  cam.x=Math.max(0,Math.min(G.px-W/2, MAP_W*TILE-W));
-  cam.y=Math.max(0,Math.min(G.py-H/2, MAP_H*TILE-H));
+  // cámara: objetivo con look-ahead (mira hacia donde avanzas) + suavizado
+  const ahead = G.scene==='dungeon' ? (G.dir==='right'?56:G.dir==='left'?-56:0) : 0;
+  const tx=Math.max(0,Math.min(G.px-W/2+ahead, MAP_W*TILE-W));
+  const ty=Math.max(0,Math.min(G.py-H/2, MAP_H*TILE-H));
+  if(camSnap){ cam.x=tx; cam.y=ty; camSnap=false; }
+  else { cam.x+=(tx-cam.x)*0.12; cam.y+=(ty-cam.y)*0.12; }
 
   cx.fillStyle='#1a3a1a';cx.fillRect(0,0,W,H);
   cx.save();
