@@ -746,6 +746,7 @@ let mobs=[],clues=[],particles=[],boss=null;
 let curCaveArt=[];   // nivel de cueva actual (generado)
 let portal=null;     // salida del nivel hacia el siguiente
 let altar=null;      // altar del objeto sagrado (tras el guardián)
+let chests=[];       // cofres de botín del nivel
 const MOB_TYPES={
   baba:      {name:'Baba del Lodo',          hp:8,  dmg:2, sp:1.0, col:'#6a8f2a', r:12, gold:3,  reward:{hp:2,line:'+2 vida máx.'}},
   reptil:    {name:'Reptil Ciego',           hp:14, dmg:4, sp:1.6, col:'#3a6e2a', r:14, gold:6,  reward:{dmg:1,line:'+1 daño'}},
@@ -790,7 +791,8 @@ function genCave(level){
   for(let i=0;i<count;i++){ const type=pool[Math.floor(rnd()*pool.length)];
     const fly=(type==='espectro'||type==='murcielago');
     spawns.push({type, tx:5+Math.floor(rnd()*(W-10)), ty: fly?(4+Math.floor(rnd()*7)):16}); }
-  return {art:g.map(r=>r.join('')), spawns, W, H, exitTx:W-2};
+  const chestList=[]; if(rnd()<0.6) chestList.push({tx:6+Math.floor(rnd()*(W-14))}); // ~60% niveles con cofre
+  return {art:g.map(r=>r.join('')), spawns, chests:chestList, W, H, exitTx:W-2};
 }
 function genArena(){ // sala del jefe (plana con esquive)
   const W=44,H=20;
@@ -803,7 +805,7 @@ function genArena(){ // sala del jefe (plana con esquive)
   return {art:g.map(r=>r.join('')), W, H};
 }
 function loadLevel(){
-  mobs=[];particles=[];boss=null;clues=[];portal=null;altar=null;G.bossSpawned=false;camSnap=true;startMusic('cave');
+  mobs=[];particles=[];boss=null;clues=[];portal=null;altar=null;chests=[];G.bossSpawned=false;camSnap=true;startMusic('cave');
   if(G.level>G.levelsTotal){                       // tras el nivel 15: el jefe
     const a=genArena(); curCaveArt=a.art; buildMap();
     G.px=3*TILE+16;G.py=(a.H-5)*TILE;G.vy=0;G.grounded=false;
@@ -812,6 +814,7 @@ function loadLevel(){
   } else {
     const lv=genCave(G.level); curCaveArt=lv.art; buildMap();
     lv.spawns.forEach(s=>spawnMob(s.type,s.tx,s.ty,G.level));
+    chests=(lv.chests||[]).map(c=>({x:c.tx*TILE+16, y:(lv.H-2)*TILE-10, open:false}));
     portal={x:lv.exitTx*TILE+16, y:(lv.H-2)*TILE-12, t:0};
     G.px=2*TILE+16;G.py=(lv.H-5)*TILE;G.vy=0;G.grounded=false;
     // atrición: solo curación total al iniciar el run; entre niveles, parcial
@@ -820,6 +823,18 @@ function loadLevel(){
     document.getElementById('chapter').textContent=G.caveName+' · Nivel '+G.level+'/'+G.levelsTotal;
   }
   hideAllPanels();updateHUD();
+}
+function openChest(c){
+  c.open=true; playSfx('buy');
+  const lvl=G.level;
+  const gold=10+Math.floor(Math.random()*20)+lvl*3;
+  G.gold+=Math.round(gold*(G.goldMult||1));
+  let msg='+'+gold+' oro';
+  if(Math.random()<0.4){ G.potions++; msg+=' · +1 poción'; }
+  if(Math.random()<0.15){ const w=SHOP_WEAPONS[Math.min(5,Math.floor(lvl/3)+1)];
+    if(!G.weapon||w.dmg>G.weapon.dmg){ G.weapon={id:w.id,name:w.name,dmg:w.dmg,maxDur:w.maxDur,dur:w.maxDur};recalcStats();msg+=' · ¡'+w.name+'!'; } }
+  for(let i=0;i<12;i++)particles.push({type:'spark',x:c.x,y:c.y-6,dx:(Math.random()-.5)*3,dy:-Math.random()*3,life:24,col:'#e8c547'});
+  showToast('¡COFRE!',msg); updateHUD(); saveGame();
 }
 function advanceLevel(){
   playSfx('portal');G.level++;
@@ -1163,6 +1178,8 @@ function update(){
   if(altar){ altar.t++;
     if(Math.hypot(G.px-altar.x,G.py-altar.y)<26){ claimRelic(altar.relic); return; }
   }
+  // cofres: tocarlos los abre
+  chests.forEach(c=>{ if(!c.open && Math.abs(G.px-c.x)<22 && Math.abs(G.py-c.y)<26) openChest(c); });
 
   // boss
   if(boss&&boss.alive){
@@ -1885,6 +1902,22 @@ function render(){
     cx.fillStyle='rgba(220,255,245,'+(0.6*gl)+')';cx.beginPath();cx.ellipse(x,y-9,2.5,6,0,0,7);cx.fill();
     cx.fillStyle='#e8c547';for(let i=0;i<3;i++){const yy=y-22+i*9;px2(x-9,yy,3,3,'#e8c547');px2(x+6,yy,3,3,'#e8c547');} // glifos
   }
+  // cofres de botín
+  chests.forEach(c=>{ const x=c.x, y=c.y;
+    cx.fillStyle='rgba(0,18,0,.4)';cx.beginPath();cx.ellipse(x,y+8,10,3,0,0,7);cx.fill();
+    cx.fillStyle='#6a4326';rr(x-9,y-2,18,10,2,'#6a4326');           // base
+    cx.fillStyle='#4a2e18';rr(x-9,y+5,18,3,1,'#4a2e18');
+    cx.fillStyle='#c9a24a';px2(x-9,y-2,2,10,'#c9a24a');px2(x+7,y-2,2,10,'#c9a24a');px2(x-1,y-2,2,10,'#c9a24a'); // herrajes
+    if(c.open){
+      cx.fillStyle='#7a5230';rr(x-9,y-12,18,5,2,'#7a5230');         // tapa levantada
+      cx.save();cx.globalCompositeOperation='lighter';cx.fillStyle='rgba(255,220,120,.4)';cx.beginPath();cx.ellipse(x,y-1,9,7,0,0,7);cx.fill();cx.restore();
+    } else {
+      cx.fillStyle='#7a5230';rr(x-9,y-8,18,7,3,'#7a5230');          // tapa cerrada
+      cx.fillStyle='#8a6038';rr(x-9,y-8,18,2,1,'#8a6038');
+      cx.fillStyle='#e8c547';px2(x-1,y-4,2,5,'#e8c547');            // cerradura
+      cx.save();cx.globalAlpha=0.5+Math.sin(waterFrame*0.12)*0.4;cx.fillStyle='#fff7d0';px2(x,y-3,1,2,'#fff7d0');cx.restore();
+    }
+  });
   // altar del objeto sagrado
   if(altar){ const x=altar.x, y=altar.y, t=altar.t*0.08, b=Math.sin(t)*3;
     cx.save();cx.globalCompositeOperation='lighter';
