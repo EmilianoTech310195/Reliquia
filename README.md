@@ -70,11 +70,10 @@ El juego tiene **dos vistas distintas** según `G.scene`:
 - Movimiento en 4 direcciones, sin gravedad ni combate. Colisión vía `solid()`/`SOLID_TYPES`. Hierba y caminos transitables; árboles/agua/edificios bloquean.
 
 **CUEVA (`'dungeon'`) — vista lateral tipo plataformas (estilo Metal Slug en mecánica):**
-- Mapa `CAVE_ART` (40×20, ancho). Avanzas a la derecha.
+- **Progresión por niveles (Capítulo I = 15 niveles + jefe):** `genCave(level)` genera cada nivel (RNG determinista `lrng`), escalando ancho, cantidad/variedad de enemigos y stats (`spawnMob(...,lvl)`). `loadLevel()` arma el nivel actual (`curCaveArt`), `advanceLevel()` pasa al siguiente. Al pasar el nivel 15 → `genArena()` + `spawnBoss()`. `G.level`/`G.levelsTotal`.
+- **Portal de salida** (`portal`) al fondo derecha: al alcanzarlo avanzas de nivel (se cura al 100% al entrar a cada nivel). El HUD muestra `NIVEL x/15`.
 - **Física de plataformas:** gravedad, salto (↑/W/touchDir.up), movimiento solo izquierda/derecha.
-- Colisión vía `solidSide()` — solo el tile tipo 20 (roca) bloquea.
-- `isRock(x,y)` detecta vecinos para dibujar bordes orgánicos.
-- Suelo principal en fila 18-19; plataformas a varias alturas; 3 pistas (2 en alto, 1 al fondo).
+- Colisión vía `solidSide()` — solo el tile tipo 20 (roca) bloquea. `isRock(x,y)` para bordes orgánicos. Suelo en las 2 filas de abajo; plataformas a varias alturas.
 - Combate cuerpo a cuerpo (golpe hacia los lados según `G.dir`).
 - Enemigos terrestres (baba/reptil/araña/guardián) tienen gravedad; **espectros y murciélagos vuelan** (flag `flying` en `MOB_TYPES`). El murciélago aletea errático en vertical.
 - Jefe (Rey de Piedra) aparece al fondo derecha, persigue horizontal con gravedad, lanza rocas en abanico.

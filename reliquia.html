@@ -499,6 +499,7 @@ const G={
   speed:2.6,
   seen:new Set(),       // tipos de monstruo ya vistos
   cluesFound:0,cluesTotal:3,
+  chapter:1,level:1,levelsTotal:15,   // progresión del capítulo
   bossUnlocked:false,bossSpawned:false,
   alive:true,running:false,
   skillCD:0,skillMax:90,
@@ -691,7 +692,7 @@ function buildMap(){
   walls=[];
   let ART;
   if(G.scene==='town'){ if(!TOWN_ART.length)buildTown(); ART=TOWN_ART; MAP_W=TOWN_W; MAP_H=TOWN_H; }
-  else { ART=CAVE_ART; MAP_W=CAVE_W; MAP_H=CAVE_H; }
+  else { if(!curCaveArt.length)curCaveArt=CAVE_ART; ART=curCaveArt; MAP_H=ART.length; MAP_W=ART[0].length; }
   for(let y=0;y<MAP_H;y++){
     let row=[];
     const src=ART[y]||"";
@@ -721,6 +722,8 @@ function buildingAt(tx,ty){ return TOWN_INFO[tx+','+ty]||null; }
 
 // ---------- entidades ----------
 let mobs=[],clues=[],particles=[],boss=null;
+let curCaveArt=[];   // nivel de cueva actual (generado)
+let portal=null;     // salida del nivel hacia el siguiente
 const MOB_TYPES={
   baba:      {name:'Baba del Lodo',          hp:8,  dmg:2, sp:1.0, col:'#6a8f2a', r:12, gold:3,  reward:{hp:2,line:'+2 vida máx.'}},
   reptil:    {name:'Reptil Ciego',           hp:14, dmg:4, sp:1.6, col:'#3a6e2a', r:14, gold:6,  reward:{dmg:1,line:'+1 daño'}},
@@ -730,39 +733,81 @@ const MOB_TYPES={
   guardian:  {name:'Guardián Roto',          hp:22, dmg:6, sp:1.2, col:'#c4a020', r:16, gold:14, reward:{atkSpeed:-2,line:'+vel. ataque'}},
 };
 
-function spawnMob(type,tx,ty){
+function spawnMob(type,tx,ty,lvl){
+  lvl=lvl||1;
   const t=MOB_TYPES[type];
-  mobs.push({type,name:t.name,hp:t.hp,maxhp:t.hp,dmg:t.dmg,sp:t.sp,col:t.col,r:t.r,
-             gold:t.gold,reward:t.reward,flying:!!t.flying,x:tx*TILE+16,y:ty*TILE+16,hit:0,
+  const hp=Math.round(t.hp*(1+(lvl-1)*0.10));      // escala con el nivel
+  const dmg=t.dmg+Math.floor((lvl-1)/3);
+  const gold=t.gold+Math.floor((lvl-1)/2);
+  mobs.push({type,name:t.name,hp,maxhp:hp,dmg,sp:t.sp,col:t.col,r:t.r,
+             gold,reward:t.reward,flying:!!t.flying,x:tx*TILE+16,y:ty*TILE+16,hit:0,
              dir:'down',animT:Math.random()*20,bob:Math.random()*6});
 }
 function spawnClue(tx,ty){clues.push({x:tx*TILE+16,y:ty*TILE+16,taken:false,bob:Math.random()*6});}
 
+// ---------- niveles de cueva (generados, escalados por dificultad) ----------
+function lrng(seed){ let s=(seed*2654435761)>>>0||1; return ()=>{ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
+function genCave(level){
+  const rnd=lrng(level*97+13);
+  const W=Math.min(40+level*2,60), H=20;
+  const g=[]; for(let y=0;y<H;y++){const r=[];for(let x=0;x<W;x++)r.push('.');g.push(r);}
+  const set=(x,y,c)=>{ if(x>=0&&x<W&&y>=0&&y<H)g[y][x]=c; };
+  for(let x=0;x<W;x++){set(x,0,'X');set(x,H-1,'X');set(x,H-2,'X');}   // techo + suelo (2)
+  for(let y=0;y<H;y++){set(0,y,'X');set(W-1,y,'X');}                  // paredes
+  const nplat=3+Math.min(level,8);                                   // plataformas
+  for(let i=0;i<nplat;i++){ const py=4+Math.floor(rnd()*11), px=4+Math.floor(rnd()*(W-12)), len=3+Math.floor(rnd()*4);
+    for(let k=0;k<len;k++)set(px+k,py,'X'); }
+  const ntor=2+Math.floor(rnd()*3);                                  // antorchas en el techo
+  for(let i=0;i<ntor;i++) set(2+Math.floor(rnd()*(W-4)),1,'o');
+  for(let y=H-6;y<H-2;y++){set(1,y,'.');set(2,y,'.');set(3,y,'.');set(W-2,y,'.');set(W-3,y,'.');} // inicio/salida despejados
+  // enemigos escalados (más tipos y cantidad por nivel)
+  const spawns=[], pool=['baba','reptil'];
+  if(level>=3)pool.push('arana'); if(level>=4)pool.push('espectro');
+  if(level>=6)pool.push('murcielago'); if(level>=8)pool.push('guardian');
+  const count=Math.min(4+level,14);
+  for(let i=0;i<count;i++){ const type=pool[Math.floor(rnd()*pool.length)];
+    const fly=(type==='espectro'||type==='murcielago');
+    spawns.push({type, tx:5+Math.floor(rnd()*(W-10)), ty: fly?(4+Math.floor(rnd()*7)):16}); }
+  return {art:g.map(r=>r.join('')), spawns, W, H, exitTx:W-2};
+}
+function genArena(){ // sala del jefe (plana con esquive)
+  const W=44,H=20;
+  const g=[]; for(let y=0;y<H;y++){const r=[];for(let x=0;x<W;x++)r.push('.');g.push(r);}
+  const set=(x,y,c)=>{g[y][x]=c;};
+  for(let x=0;x<W;x++){set(x,0,'X');set(x,H-1,'X');set(x,H-2,'X');}
+  for(let y=0;y<H;y++){set(0,y,'X');set(W-1,y,'X');}
+  for(let k=0;k<5;k++){set(6+k,12,'X');set(W-11+k,12,'X');}
+  set(4,1,'o');set(W-5,1,'o');set(22,1,'o');
+  return {art:g.map(r=>r.join('')), W, H};
+}
+function loadLevel(){
+  mobs=[];particles=[];boss=null;clues=[];portal=null;G.bossSpawned=false;
+  if(G.level>G.levelsTotal){                       // tras el nivel 15: el jefe
+    const a=genArena(); curCaveArt=a.art; buildMap();
+    G.px=3*TILE+16;G.py=(a.H-5)*TILE;G.vy=0;G.grounded=false;
+    G.hp=G.maxhp;G.alive=true;G.iframes=40;G.near=null;
+    spawnBoss();
+  } else {
+    const lv=genCave(G.level); curCaveArt=lv.art; buildMap();
+    lv.spawns.forEach(s=>spawnMob(s.type,s.tx,s.ty,G.level));
+    portal={x:lv.exitTx*TILE+16, y:(lv.H-2)*TILE-12, t:0};
+    G.px=2*TILE+16;G.py=(lv.H-5)*TILE;G.vy=0;G.grounded=false;
+    G.hp=G.maxhp;G.alive=true;G.iframes=40;G.near=null;
+    document.getElementById('chapter').textContent=G.caveName+' · Nivel '+G.level+'/'+G.levelsTotal;
+  }
+  hideAllPanels();updateHUD();
+}
+function advanceLevel(){
+  G.level++;
+  if(G.level>G.levelsTotal) showToast('ÚLTIMO PASO','El templo tiembla...<br>algo colosal despierta abajo.');
+  else showToast('NIVEL SUPERADO','Avanzas más hondo.<br>Nivel '+G.level+'/'+G.levelsTotal+'.');
+  saveGame(); loadLevel();
+}
 function enterDungeon(full,name){
   G.scene='dungeon';
   G.caveName=name||'CUEVA DEL TEMPLO';
-  buildMap();
-  mobs=[];clues=[];particles=[];boss=null;
-  G.bossSpawned=false;
-  // enemigos terrestres caen al suelo (fila 18); los pongo un poco arriba
-  spawnMob('baba',6,16);spawnMob('baba',15,16);spawnMob('baba',24,16);
-  spawnMob('baba',31,16);spawnMob('reptil',10,16);
-  spawnMob('reptil',20,16);spawnMob('reptil',28,16);
-  // espectros vuelan a media altura
-  spawnMob('espectro',13,8);spawnMob('espectro',22,6);spawnMob('espectro',30,10);
-  // murciélagos: vuelo errático en lo alto
-  spawnMob('murcielago',9,5);spawnMob('murcielago',26,4);spawnMob('murcielago',33,7);
-  // arañas: acechan ágiles en el suelo
-  spawnMob('arana',12,16);spawnMob('arana',23,16);spawnMob('arana',32,16);
-  spawnMob('guardian',18,16);spawnMob('guardian',34,16);
-  // pistas: en plataformas altas y al fondo
-  spawnClue(11,2);spawnClue(24,6);spawnClue(36,16);
-  if(full){G.cluesFound=0;G.bossUnlocked=false;}
-  // jugador entra por la izquierda, cae al suelo
-  G.px=3*TILE+16;G.py=16*TILE; G.vy=0;G.grounded=false;
-  G.hp=G.maxhp;G.alive=true;G.iframes=40;
-  document.getElementById('chapter').textContent=G.caveName;
-  G.near=null;hideAllPanels();updateHUD();
+  if(full) G.level=1;
+  loadLevel();
   if(!G.godWarned){ G.godWarned=true; showGodModal(); }
 }
 function enterTown(){
@@ -1011,19 +1056,10 @@ function update(){
     if(d<m.r+8)hurtPlayer(m.dmg);
   });
 
-  // pistas
-  clues.forEach(c=>{
-    if(!c.taken&&Math.hypot(G.px-c.x,G.py-c.y)<12){
-      c.taken=true;G.cluesFound++;
-      if(G.cluesFound>=G.cluesTotal){
-        G.bossUnlocked=true;
-        showToast('PISTA FINAL','Las pistas señalan el centro.<br>Algo despierta abajo...');
-        if(!G.bossSpawned)spawnBoss();
-      }else{
-        showToast('PISTA HALLADA','"...el tesoro yace bajo el guardián..."');
-      }
-    }
-  });
+  // portal de salida: llegar al fondo avanza de nivel
+  if(portal){ portal.t++;
+    if(Math.hypot(G.px-portal.x,G.py-portal.y)<22){ advanceLevel(); return; }
+  }
 
   // boss
   if(boss&&boss.alive){
@@ -1074,8 +1110,8 @@ function update(){
 
 function spawnBoss(){
   G.bossSpawned=true;
-  // el Rey de Piedra aparece al fondo de la cueva (derecha), sobre el suelo
-  boss={alive:true,x:36*TILE,y:14*TILE,hp:120,maxhp:120,dmg:8,sp:1.0,r:26,hit:0,atkT:90,vy:0};
+  // el Rey de Piedra aparece al fondo de la arena (derecha), sobre el suelo
+  boss={alive:true,x:(MAP_W-8)*TILE,y:(MAP_H-6)*TILE,hp:120,maxhp:120,dmg:8,sp:1.0,r:26,hit:0,atkT:90,vy:0};
   document.getElementById('chapter').textContent='⚠ REY DE PIEDRA';
   showBossIntro();
 }
@@ -1730,11 +1766,19 @@ function render(){
     else if(t===22)drawTorch(px,py,x,y);     // antorcha de pared
   }
   // pistas (pergamino dorado flotante con destello)
-  clues.forEach(c=>{if(c.taken)return;c.bob+=.12;const b=Math.sin(c.bob)*4;
-    cx.fillStyle='rgba(232,197,71,.3)';cx.beginPath();cx.arc(c.x,c.y+b,11,0,7);cx.fill(); // halo
-    px2(c.x-6,c.y-7+b,12,14,'#d8b84a'); px2(c.x-6,c.y-7+b,12,4,'#f0d870');                // pergamino
-    px2(c.x-4,c.y-3+b,8,2,'#8a6a2a'); px2(c.x-4,c.y+1+b,8,2,'#8a6a2a');                   // texto
-    cx.fillStyle='#fff7d0';cx.fillRect(c.x-5,c.y-6+b,2,2);});
+  // portal de salida del nivel: arco de piedra con energía azteca
+  if(portal){ const x=portal.x, y=portal.y, t=portal.t*0.12;
+    const gl=0.5+Math.sin(t)*0.3;
+    cx.save();cx.globalCompositeOperation='lighter';
+    const pg=cx.createRadialGradient(x,y-6,2,x,y-6,30); pg.addColorStop(0,'rgba(120,230,200,'+(0.35*gl)+')');pg.addColorStop(1,'rgba(120,230,200,0)');
+    cx.fillStyle=pg;cx.beginPath();cx.arc(x,y-6,30,0,7);cx.fill();cx.restore();
+    cx.fillStyle='#6a6258';rr(x-12,y-26,24,28,3,'#6a6258');           // marco de piedra
+    cx.fillStyle='#4a443c';rr(x-8,y-22,16,24,2,'#4a443c');
+    // remolino de energía
+    cx.fillStyle='rgba(120,230,200,'+(0.5+gl*0.3)+')';cx.beginPath();cx.ellipse(x,y-9,6+Math.sin(t)*1.5,11,0,0,7);cx.fill();
+    cx.fillStyle='rgba(220,255,245,'+(0.6*gl)+')';cx.beginPath();cx.ellipse(x,y-9,2.5,6,0,0,7);cx.fill();
+    cx.fillStyle='#e8c547';for(let i=0;i<3;i++){const yy=y-22+i*9;px2(x-9,yy,3,3,'#e8c547');px2(x+6,yy,3,3,'#e8c547');} // glifos
+  }
   // mobs (sprites con dirección y animación)
   mobs.forEach(m=>drawMob(m));
   // boss: Rey de Piedra — coloso pétreo coronado de calaveras
@@ -1911,7 +1955,7 @@ function updateHUD(){
   document.getElementById('gold').textContent='⬤ '+G.gold;
   // pistas solo en la cueva
   const cluesEl=document.getElementById('clues');
-  cluesEl.innerHTML = G.scene==='dungeon' ? ('PISTAS '+G.cluesFound+'/'+G.cluesTotal) : '';
+  cluesEl.innerHTML = (G.scene==='dungeon' && !boss) ? ('NIVEL '+Math.min(G.level,G.levelsTotal)+'/'+G.levelsTotal) : '';
   // equipo
   const wp=G.weapon?Math.round(G.weapon.dur/G.weapon.maxDur*100)+'%':'—';
   const ap=G.armor?Math.round(G.armor.dur/G.armor.maxDur*100)+'%':'—';
@@ -2162,8 +2206,8 @@ document.getElementById('respawn-btn').addEventListener('click',()=>{
 });
 document.getElementById('next-btn').addEventListener('click',()=>{
   document.getElementById('win-screen').style.display='none';
-  showToast('VICTORIA','Vuelves al pueblo como leyenda.');
-  G.cluesFound=0;
+  showToast('VICTORIA','Vuelves a la villa como leyenda.');
+  G.cluesFound=0;G.level=1;
   enterTown();G.running=true;updateHUD();saveGame();
 });
 
