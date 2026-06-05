@@ -137,7 +137,7 @@ El arte dibujado por código tiene techo: se ve geométrico. Para lograr look ti
 
 ### 2. Otros
 - Diseño Capítulo II (más dioses/reliquias, alcance mundial).
-- Balance/progresión (números: precios, daño, durabilidad, respeto necesario).
+- Balance/progresión (✅ pase inicial): oro ~1159/run (tope de equipo ≈2 runs); **defensa con retornos decrecientes** `d*(12/(12+def))` (nunca anula); jefe 240hp/9dmg; **curación parcial entre niveles** (40%, total solo al iniciar el run y en el jefe); respeto sube con curación modesta (+8, no total). Tunear más con playtesting real.
 - Más contenido de cueva (niveles, sub-jefes, variedad de monstruos).
 - Guardado: actualmente solo en memoria de sesión (`savedGame`), no en disco/localStorage.
 - Empaquetado como app (PWA/Capacitor) — diferido hasta terminar diseño.

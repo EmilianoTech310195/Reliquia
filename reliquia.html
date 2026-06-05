@@ -521,18 +521,18 @@ const G={
 const SHOP_WEAPONS=[
   {id:'w1',name:'Daga Oxidada',   dmg:2, price:20,  maxDur:100},
   {id:'w2',name:'Machete',        dmg:4, price:55,  maxDur:120},
-  {id:'w3',name:'Hacha de Guerra',dmg:7, price:120, maxDur:140},
-  {id:'w4',name:'Espada Jade',    dmg:10,price:240, maxDur:160},
-  {id:'w5',name:'Lanza Ritual',   dmg:13,price:420, maxDur:180},
-  {id:'w6',name:'Filo del Sol',   dmg:18,price:800, maxDur:220},
+  {id:'w3',name:'Hacha de Guerra',dmg:7, price:130, maxDur:140},
+  {id:'w4',name:'Espada Jade',    dmg:10,price:280, maxDur:160},
+  {id:'w5',name:'Lanza Ritual',   dmg:13,price:560, maxDur:180},
+  {id:'w6',name:'Filo del Sol',   dmg:18,price:1100,maxDur:220},
 ];
 const SHOP_ARMORS=[
   {id:'a1',name:'Tela de Viaje',   def:1, hp:4,  price:18,  maxDur:100},
   {id:'a2',name:'Cuero Curtido',   def:2, hp:8,  price:50,  maxDur:120},
-  {id:'a3',name:'Coraza de Bronce',def:4, hp:14, price:110, maxDur:140},
-  {id:'a4',name:'Placas de Obsidiana',def:6,hp:22,price:230,maxDur:160},
-  {id:'a5',name:'Mallas de Jade',  def:9, hp:32, price:400, maxDur:180},
-  {id:'a6',name:'Égida del Templo',def:13,hp:48, price:780, maxDur:220},
+  {id:'a3',name:'Coraza de Bronce',def:4, hp:14, price:120, maxDur:140},
+  {id:'a4',name:'Placas de Obsidiana',def:6,hp:22,price:270,maxDur:160},
+  {id:'a5',name:'Mallas de Jade',  def:9, hp:32, price:540, maxDur:180},
+  {id:'a6',name:'Égida del Templo',def:13,hp:48, price:1050,maxDur:220},
 ];
 const SHOP_POTIONS=[
   {id:'p1',name:'Poción Menor',   heal:15,  price:12},
@@ -750,7 +750,7 @@ function spawnMob(type,tx,ty,lvl){
   const t=MOB_TYPES[type];
   const hp=Math.round(t.hp*(1+(lvl-1)*0.10));      // escala con el nivel
   const dmg=t.dmg+Math.floor((lvl-1)/3);
-  const gold=t.gold+Math.floor((lvl-1)/2);
+  const gold=Math.max(1,Math.round(t.gold*0.6))+Math.floor((lvl-1)/3);  // economía ajustada
   mobs.push({type,name:t.name,hp,maxhp:hp,dmg,sp:t.sp,col:t.col,r:t.r,
              gold,reward:t.reward,flying:!!t.flying,x:tx*TILE+16,y:ty*TILE+16,hit:0,
              dir:'down',animT:Math.random()*20,bob:Math.random()*6});
@@ -804,7 +804,9 @@ function loadLevel(){
     lv.spawns.forEach(s=>spawnMob(s.type,s.tx,s.ty,G.level));
     portal={x:lv.exitTx*TILE+16, y:(lv.H-2)*TILE-12, t:0};
     G.px=2*TILE+16;G.py=(lv.H-5)*TILE;G.vy=0;G.grounded=false;
-    G.hp=G.maxhp;G.alive=true;G.iframes=40;G.near=null;
+    // atrición: solo curación total al iniciar el run; entre niveles, parcial
+    G.hp = (G.level<=1)? G.maxhp : Math.min(G.maxhp, G.hp+Math.round(G.maxhp*0.4));
+    G.alive=true;G.iframes=40;G.near=null;
     document.getElementById('chapter').textContent=G.caveName+' · Nivel '+G.level+'/'+G.levelsTotal;
   }
   hideAllPanels();updateHUD();
@@ -939,7 +941,7 @@ function gainResp(n){
   G.resp+=n;
   while(G.resp>=G.respMax){
     G.resp-=G.respMax;G.respLevel++;G.respMax=Math.floor(G.respMax*1.4);
-    G.maxhp+=4;G.hp=G.maxhp;G.dmg+=1;
+    G.maxhp+=4;G.hp=Math.min(G.maxhp,G.hp+8);G.dmg+=1;  // curación modesta, no total (mantiene la atrición)
     showToast('RESPETO GANADO','El templo te teme un poco más.<br>+vida +daño');
   }
 }
@@ -949,7 +951,7 @@ function spawnSlash(x,y,big){particles.push({type:'slash',x,y,life:8,maxlife:8,b
 // ---------- daño al jugador ----------
 function hurtPlayer(d){
   if(G.iframes>0)return;
-  d=Math.max(1,d-G.defense);
+  d=Math.max(1,Math.round(d*(12/(12+G.defense))));  // defensa con retornos decrecientes (nunca anula)
   G.hp-=d;G.iframes=30;G.hurtT=12;
   for(let i=0;i<5;i++)particles.push({type:'spark',x:G.px,y:G.py,dx:(Math.random()-.5)*3,dy:(Math.random()-.5)*3,life:16,col:'#a02c2c'});
   if(G.hp<=0){G.hp=0;die();}
@@ -1127,7 +1129,7 @@ function update(){
 function spawnBoss(){
   G.bossSpawned=true;
   // el Rey de Piedra aparece al fondo de la arena (derecha), sobre el suelo
-  boss={alive:true,x:(MAP_W-8)*TILE,y:(MAP_H-6)*TILE,hp:120,maxhp:120,dmg:8,sp:1.0,r:26,hit:0,atkT:90,vy:0};
+  boss={alive:true,x:(MAP_W-8)*TILE,y:(MAP_H-6)*TILE,hp:240,maxhp:240,dmg:9,sp:1.0,r:26,hit:0,atkT:90,vy:0};
   document.getElementById('chapter').textContent='⚠ REY DE PIEDRA';
   showBossIntro();
 }
