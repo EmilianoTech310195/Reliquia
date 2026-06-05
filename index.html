@@ -803,7 +803,7 @@ function genArena(){ // sala del jefe (plana con esquive)
   return {art:g.map(r=>r.join('')), W, H};
 }
 function loadLevel(){
-  mobs=[];particles=[];boss=null;clues=[];portal=null;altar=null;G.bossSpawned=false;camSnap=true;
+  mobs=[];particles=[];boss=null;clues=[];portal=null;altar=null;G.bossSpawned=false;camSnap=true;startMusic('cave');
   if(G.level>G.levelsTotal){                       // tras el nivel 15: el jefe
     const a=genArena(); curCaveArt=a.art; buildMap();
     G.px=3*TILE+16;G.py=(a.H-5)*TILE;G.vy=0;G.grounded=false;
@@ -822,7 +822,7 @@ function loadLevel(){
   hideAllPanels();updateHUD();
 }
 function advanceLevel(){
-  G.level++;
+  playSfx('portal');G.level++;
   if(G.level>G.levelsTotal) showToast('ÚLTIMO PASO','El templo tiembla...<br>algo colosal despierta abajo.');
   else showToast('NIVEL SUPERADO','Avanzas más hondo.<br>Nivel '+G.level+'/'+G.levelsTotal+'.');
   saveGame(); loadLevel();
@@ -839,7 +839,7 @@ function enterTown(){
   buildMap();
   mobs=[];clues=[];particles=[];boss=null;
   G.px=23*TILE+16;G.py=35*TILE+16;    // avenida de la villa, bajo la plaza
-  G.hp=G.maxhp;G.alive=true;G.iframes=20;G.near=null;camSnap=true;
+  G.hp=G.maxhp;G.alive=true;G.iframes=20;G.near=null;camSnap=true;startMusic('town');
   document.getElementById('chapter').textContent='VILLA DE TENOCH';
   hideAllPanels();updateHUD();
 }
@@ -896,10 +896,77 @@ const skillBtn=document.getElementById('btn-skill');
 skillBtn.addEventListener('touchstart',e=>{e.preventDefault();doSkill();});
 skillBtn.addEventListener('mousedown',e=>{e.preventDefault();doSkill();});
 
+// ---------- audio (WebAudio sintetizado, sin archivos externos) ----------
+let AC=null,masterGain=null,musicGain=null,muted=false,musicTimer=null,musicScene=null,musicStep=0;
+function initAudio(){
+  if(AC)return;
+  try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){return;}
+  masterGain=AC.createGain();masterGain.gain.value=0.55;masterGain.connect(AC.destination);
+  musicGain=AC.createGain();musicGain.gain.value=0.5;musicGain.connect(masterGain);
+}
+function resumeAudio(){ if(AC&&AC.state==='suspended')AC.resume(); }
+function tone(freq,dur,type,vol,slideTo,dest){
+  if(!AC||muted)return;
+  const t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();
+  o.type=type||'square';o.frequency.setValueAtTime(freq,t);
+  if(slideTo)o.frequency.exponentialRampToValueAtTime(Math.max(1,slideTo),t+dur);
+  g.gain.setValueAtTime(Math.max(0.0001,vol||0.2),t);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g).connect(dest||masterGain);o.start(t);o.stop(t+dur+0.02);
+}
+function noise(dur,vol,filterFreq){
+  if(!AC||muted)return;
+  const t=AC.currentTime,n=Math.floor(AC.sampleRate*dur),buf=AC.createBuffer(1,n,AC.sampleRate),d=buf.getChannelData(0);
+  for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);
+  const src=AC.createBufferSource();src.buffer=buf;const g=AC.createGain();g.gain.value=vol||0.2;let node=src;
+  if(filterFreq){const f=AC.createBiquadFilter();f.type='lowpass';f.frequency.value=filterFreq;src.connect(f);node=f;}
+  node.connect(g).connect(masterGain);src.start(t);
+}
+function playSfx(name){
+  if(!AC||muted)return;
+  switch(name){
+    case 'swing': tone(520,0.10,'sawtooth',0.10,180);break;
+    case 'hit': noise(0.08,0.16,2200);tone(160,0.08,'square',0.10,90);break;
+    case 'enemyDie': noise(0.18,0.18,1400);tone(220,0.18,'square',0.10,70);break;
+    case 'jump': tone(300,0.16,'square',0.12,620);break;
+    case 'hurt': tone(200,0.18,'sawtooth',0.14,70);noise(0.10,0.08,800);break;
+    case 'heal': tone(520,0.10,'sine',0.12,780);setTimeout(()=>tone(780,0.12,'sine',0.10),90);break;
+    case 'buy': tone(740,0.07,'square',0.12);setTimeout(()=>tone(990,0.09,'square',0.10),70);break;
+    case 'error': tone(150,0.18,'square',0.14,110);break;
+    case 'levelup': [523,659,784,1047].forEach((f,i)=>setTimeout(()=>tone(f,0.12,'square',0.10),i*70));break;
+    case 'relic': [659,784,988,1319].forEach((f,i)=>setTimeout(()=>tone(f,0.18,'sine',0.12),i*95));break;
+    case 'portal': [784,1047,1319].forEach((f,i)=>setTimeout(()=>tone(f,0.14,'sine',0.10),i*60));break;
+    case 'bossHit': noise(0.12,0.18,500);tone(90,0.14,'square',0.14,50);break;
+    case 'bossDefeat': noise(0.6,0.28,900);[330,247,165,110].forEach((f,i)=>setTimeout(()=>tone(f,0.4,'sawtooth',0.16),i*150));break;
+  }
+}
+const MUSIC={ // loop ambiente por escena (offsets en semitonos)
+  town:{tempo:430, root:262, notes:[0,4,7,4, 0,4,9,7, 5,9,7,4, 2,4,7,4]},
+  cave:{tempo:500, root:196, notes:[0,3,7, 0,3,8, 0,2,5, -2,3,7]},
+};
+function startMusic(scene){
+  musicScene=scene;
+  if(!AC)return;            // arrancará en el primer gesto
+  musicStep=0;
+  if(musicTimer)clearInterval(musicTimer);
+  const m=MUSIC[scene]; if(!m){musicTimer=null;return;}
+  musicTimer=setInterval(()=>{
+    if(muted||!AC)return;
+    const seq=m.notes,semi=seq[musicStep%seq.length],freq=m.root*Math.pow(2,semi/12);
+    tone(freq,0.32,'triangle',0.05,null,musicGain);
+    if(musicStep%4===0)tone(m.root/2,0.5,'sine',0.06,null,musicGain); // bajo
+    musicStep++;
+  }, m.tempo);
+}
+function toggleMute(){ muted=!muted; resumeAudio(); showToast(muted?'SONIDO OFF':'SONIDO ON','(tecla M)'); }
+addEventListener('keydown',e=>{ if(e.key.toLowerCase()==='m')toggleMute(); });
+function firstGesture(){ initAudio();resumeAudio(); if(musicScene)startMusic(musicScene);
+  removeEventListener('pointerdown',firstGesture);removeEventListener('keydown',firstGesture); }
+addEventListener('pointerdown',firstGesture);addEventListener('keydown',firstGesture);
+
 // ---------- combate ----------
 function doAttack(){
   if(!G.running||!G.alive||G.atkTimer>0)return;
-  G.atkTimer=G.atkSpeed;
+  G.atkTimer=G.atkSpeed;playSfx('swing');
   // hitbox enfrente
   let hx=G.px,hy=G.py;
   if(G.dir==='up')hy-=G.atkRange;if(G.dir==='down')hy+=G.atkRange;
@@ -923,7 +990,7 @@ function doSkill(){
 function hitArea(hx,hy,rad,dmg){
   mobs.forEach(m=>{
     if(Math.hypot(m.x-hx,m.y-hy)<rad+m.r){
-      m.hp-=dmg;m.hit=8;
+      m.hp-=dmg;m.hit=8;playSfx('hit');
       m.kbx=(m.x>=hx?1:-1)*6; if(!m.flying)m.vy=-2.5; // empuje + saltito
       for(let i=0;i<4;i++)particles.push({type:'spark',x:m.x,y:m.y,dx:(Math.random()-.5)*2,dy:(Math.random()-.5)*2,life:14,col:m.col});
       if(m.hp<=0)killMob(m);
@@ -931,13 +998,14 @@ function hitArea(hx,hy,rad,dmg){
     }
   });
   if(boss&&boss.alive&&Math.hypot(boss.x-hx,boss.y-hy)<rad+boss.r){
-    boss.hp-=dmg;boss.hit=8;
+    boss.hp-=dmg;boss.hit=8;playSfx('bossHit');
     boss.kbx=(boss.x>=hx?1:-1)*2; // el coloso apenas se tambalea
     for(let i=0;i<6;i++)particles.push({type:'spark',x:boss.x,y:boss.y,dx:(Math.random()-.5)*3,dy:(Math.random()-.5)*3,life:18,col:'#e8c547'});
     if(boss.hp<=0)defeatBoss();
   }
 }
 function killMob(m){
+  playSfx('enemyDie');
   G.gold+=Math.round(m.gold*(G.goldMult||1));
   // recompensa por monstruo NUEVO
   if(!G.seen.has(m.type)){
@@ -958,7 +1026,7 @@ function gainResp(n){
   while(G.resp>=G.respMax){
     G.resp-=G.respMax;G.respLevel++;G.respMax=Math.floor(G.respMax*1.4);
     G.maxhp+=4;G.hp=Math.min(G.maxhp,G.hp+8);G.dmg+=1;  // curación modesta, no total (mantiene la atrición)
-    showToast('RESPETO GANADO','El templo te teme un poco más.<br>+vida +daño');
+    playSfx('levelup');showToast('RESPETO GANADO','El templo te teme un poco más.<br>+vida +daño');
   }
 }
 
@@ -968,7 +1036,7 @@ function spawnSlash(x,y,big){particles.push({type:'slash',x,y,life:8,maxlife:8,b
 function hurtPlayer(d){
   if(G.iframes>0)return;
   d=Math.max(1,Math.round(d*(12/(12+G.defense))));  // defensa con retornos decrecientes (nunca anula)
-  G.hp-=d;G.iframes=30;G.hurtT=12;
+  G.hp-=d;G.iframes=30;G.hurtT=12;playSfx('hurt');
   for(let i=0;i<5;i++)particles.push({type:'spark',x:G.px,y:G.py,dx:(Math.random()-.5)*3,dy:(Math.random()-.5)*3,life:16,col:'#a02c2c'});
   if(G.hp<=0){G.hp=0;die();}
 }
@@ -1030,7 +1098,7 @@ function update(){
   if(G.grounded) G.coyote=6; else if(G.coyote>0) G.coyote--;       // gracia tras dejar el borde
   if(jumpPressed) G.jumpBuf=7; else if(G.jumpBuf>0) G.jumpBuf--;   // pre-buffer del salto
   if(G.jumpBuf>0 && (G.grounded||G.coyote>0)){
-    G.vy=-G.jumpForce; G.grounded=false; G.coyote=0; G.jumpBuf=0; G.jumping=true;
+    G.vy=-G.jumpForce; G.grounded=false; G.coyote=0; G.jumpBuf=0; G.jumping=true; playSfx('jump');
   }
   if(!jumpHeld && G.jumping && G.vy<0){ G.vy*=0.45; G.jumping=false; } // soltar = salto corto
   if(G.vy>=0) G.jumping=false;
@@ -1133,7 +1201,7 @@ function update(){
       if(p.type==='bolt'){
         mobs.forEach(m=>{if(!p.hits.has(m)&&Math.hypot(m.x-p.x,m.y-p.y)<m.r+6){
           m.hp-=p.dmg;m.hit=8;p.hits.add(m);m.kbx=(m.x>=p.x?1:-1)*7;if(!m.flying)m.vy=-2;if(m.hp<=0)killMob(m);}});
-        if(boss&&boss.alive&&Math.hypot(boss.x-p.x,boss.y-p.y)<boss.r+6){boss.hp-=p.dmg;boss.hit=8;boss.kbx=(boss.x>=p.x?1:-1)*2;if(boss.hp<=0)defeatBoss();}
+        if(boss&&boss.alive&&Math.hypot(boss.x-p.x,boss.y-p.y)<boss.r+6){boss.hp-=p.dmg;boss.hit=8;boss.kbx=(boss.x>=p.x?1:-1)*2;playSfx('bossHit');if(boss.hp<=0)defeatBoss();}
       }
       if(p.type==='bossbolt'&&Math.hypot(G.px-p.x,G.py-p.y)<14){hurtPlayer(p.dmg);p.life=0;}
     }else{p.x+=(p.dx||0);p.y+=(p.dy||0);}
@@ -2032,6 +2100,7 @@ function showToast(title,body){
 
 // ---------- guardián vencido -> objeto sagrado ----------
 function defeatBoss(){
+  playSfx('bossDefeat');
   const bx=boss?boss.x:(MAP_W/2)*TILE;
   if(boss)boss.alive=false; boss=null;
   for(let i=0;i<24;i++)particles.push({type:'spark',x:bx,y:(MAP_H-4)*TILE,dx:(Math.random()-.5)*5,dy:(Math.random()-.5)*5,life:26,col:'#e8c547'});
@@ -2041,7 +2110,7 @@ function defeatBoss(){
   showToast('¡EL GUARDIÁN CAE!','Una luz se alza del fondo...<br>el OBJETO SAGRADO te espera.');
 }
 function claimRelic(r){
-  altar=null;
+  altar=null;playSfx('relic');
   if(!G.relics.has(r.id)){ G.relics.add(r.id); r.apply(); recalcStats(); G.hp=G.maxhp; }
   winGame(r,false);
 }
@@ -2134,11 +2203,11 @@ function renderShop(kind){
   });
 }
 function buyItem(kind,it){
-  if(G.gold<it.price){shopMsg('No tienes oro suficiente.');return;}
+  if(G.gold<it.price){playSfx('error');shopMsg('No tienes oro suficiente.');return;}
   if(kind==='powerups' && G.powers.has(it.id)){return;}
   if(kind==='enchant'){ const t=it.slot==='weapon'?G.weapon:G.armor;
-    if(!t){shopMsg('Necesitas un '+(it.slot==='weapon'?'arma':'armadura')+' equipada.');return;} }
-  G.gold-=it.price;
+    if(!t){playSfx('error');shopMsg('Necesitas un '+(it.slot==='weapon'?'arma':'armadura')+' equipada.');return;} }
+  G.gold-=it.price;playSfx('buy');
   if(kind==='weapons'){G.weapon={id:it.id,name:it.name,dmg:it.dmg,maxDur:it.maxDur,dur:it.maxDur};
     recalcStats();shopMsg(it.name+' equipada. Daño ahora '+G.dmg+'.');}
   else if(kind==='armors'){G.armor={id:it.id,name:it.name,def:it.def,hp:it.hp,maxDur:it.maxDur,dur:it.maxDur};
@@ -2190,8 +2259,8 @@ function renderRepair(){
 // ----- usar poción (tecla L o botón) -----
 function usePotion(){
   if(G.scene!=='dungeon'||!G.running||!G.alive)return;
-  if(G.potions<=0){showToast('SIN POCIONES','Compra en el pueblo.');return;}
-  G.potions--;G.hp=Math.min(G.maxhp,G.hp+35);
+  if(G.potions<=0){playSfx('error');showToast('SIN POCIONES','Compra en el pueblo.');return;}
+  G.potions--;G.hp=Math.min(G.maxhp,G.hp+35);playSfx('heal');
   showToast('POCIÓN','Recuperas vida (+35).');updateHUD();
 }
 addEventListener('keydown',e=>{if(e.key.toLowerCase()==='l')usePotion();});
