@@ -507,6 +507,7 @@ const G={
   scene:'town',            // 'town' | 'dungeon'
   baseDmg:4,baseDef:0,baseMaxhp:20,   // stats sin equipo (clases)
   weapon:null,armor:null,  // equipo equipado {name,power,dur,maxDur,...}
+  powers:new Set(),        // potenciadores permanentes comprados
   potions:0,               // pociones en bolsa
   near:null,               // edificio/NPC cercano para interactuar
   godWarned:false,         // si el dios ya advirtió al entrar a la cueva
@@ -537,6 +538,21 @@ const SHOP_POTIONS=[
   {id:'p4',name:'Elixir Completo',heal:999, price:130},
   {id:'p5',name:'Tónico de Furia',heal:0, buff:'dmg', price:90},
   {id:'p6',name:'Tónico Pétreo',  heal:0, buff:'def', price:90},
+];
+// potenciadores: mejoras PERMANENTES (una vez cada una)
+const SHOP_POWERS=[
+  {id:'pw1',name:'Tónico de Vigor',  desc:'+8 vida máxima',  price:60,  apply:()=>{G.baseMaxhp+=8;}},
+  {id:'pw2',name:'Reliquia de Furia',desc:'+2 daño base',    price:90,  apply:()=>{G.baseDmg+=2;}},
+  {id:'pw3',name:'Piel de Jade',     desc:'+2 defensa base',  price:90,  apply:()=>{G.baseDef+=2;}},
+  {id:'pw4',name:'Pies de Viento',   desc:'+vel. movimiento', price:80,  apply:()=>{G.speed+=0.3;}},
+  {id:'pw5',name:'Reflejos Felinos', desc:'+vel. de ataque',  price:120, apply:()=>{G.atkSpeed=Math.max(5,G.atkSpeed-2);}},
+];
+// encantamientos: se aplican al EQUIPO equipado (arma o armadura)
+const SHOP_ENCHANTS=[
+  {id:'en1',name:'Filo Ardiente', desc:'+3 daño al arma',        price:100, slot:'weapon', apply:w=>{w.dmg+=3;}},
+  {id:'en2',name:'Sed de Vida',   desc:'roba vida al golpear',   price:150, slot:'weapon', apply:w=>{G.lifesteal=(G.lifesteal||0)+2;}},
+  {id:'en3',name:'Égida Sagrada', desc:'+3 defensa a la armadura',price:100, slot:'armor',  apply:a=>{a.def+=3;}},
+  {id:'en4',name:'Fortaleza',     desc:'+12 vida a la armadura', price:120, slot:'armor',  apply:a=>{a.hp+=12;}},
 ];
 const REPAIR_COST_PER_PCT=2; // oro por cada % a reparar
 
@@ -609,38 +625,58 @@ const CAVE_ART=[
 ];
 const CAVE_W=40, CAVE_H=20;
 
-// ===== MAPA DEL PUEBLO =====
-// S=piedra H=pared D=puerta R=tejado N=npc C=cueva G=hierba T=árbol P=camino F=flor
-const TOWN_ART=[
- "TTTTTTTTTTTTTTTT",
- "TGGGGGGGGGGGGGGT",
- "TGRRRGGGGGRRRGGT",
- "TGRHRGGGGGRHRGGT",
- "TGRDRGGGGGRDRGGT",
- "TGSSSGGGGGSSSGGT",
- "TGGSGGGGGGGSGGGT",
- "TGGSSSSPSSSSSGGT",
- "TGGGGGSPSGGGGGGT",
- "TGRRRGSPSGRRRGGT",
- "TGRHRGSPSGRHRGGT",
- "TGRDRGSPSGRDRGGT",
- "TGSSSGSPSGSSSGGT",
- "TGGGGGSPSGGGGGGT",
- "TGGNGGSPSGGNGGGT",
- "TGGGGGSPSGGGGGGT",
- "TGGGGGSPSGGGGGGT",
- "TGFGGGGPGGGGFGGT",
- "TGGGGGGPGGGGGGGT",
- "TTTTTTCPTTTTTTTT",
- "TTTTTTSPTTTTTTTT",
- "TTTTTTTTTTTTTTTT",
-];
-const buildingInfo={}; // se llena al construir: pos de puertas/cuevas/npcs
+// ===== VILLA DE TENOCH (mundo abierto, generado) =====
+// chars: G hierba · T árbol · P camino · F flor · S piedra · H pared · D puerta · R tejado · N npc · C cueva · W agua(fuente)
+let TOWN_ART=[];
+let TOWN_INFO={};            // "x,y" -> {kind:'shop'|'cave'|'npc', ...}
+const TOWN_W=24, TOWN_H=30;
+function buildTown(){
+  const W=TOWN_W,H=TOWN_H;
+  const g=[]; for(let y=0;y<H;y++){const row=[];for(let x=0;x<W;x++)row.push('G');g.push(row);}
+  TOWN_INFO={};
+  const set=(x,y,c)=>{ if(x>=0&&x<W&&y>=0&&y<H)g[y][x]=c; };
+  const walk=(x,y)=>{const c=g[y]&&g[y][x]; return c==='G'||c==='F';}; // solo decorar sobre hierba
+  const hpath=(x1,x2,y)=>{ for(let x=Math.min(x1,x2);x<=Math.max(x1,x2);x++) if(walk(x,y))set(x,y,'P'); };
+  const vpath=(y1,y2,x)=>{ for(let y=Math.min(y1,y2);y<=Math.max(y1,y2);y++) if(walk(x,y))set(x,y,'P'); };
+  // borde de árboles
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++) if(x<2||x>=W-2||y<2||y>=H-2) g[y][x]='T';
+  // plaza central de piedra con fuente
+  for(let y=12;y<=16;y++)for(let x=9;x<=15;x++)set(x,y,'S');
+  set(12,14,'W');set(11,14,'W');set(12,13,'W');
+  // edificio 3x4 (RRR/RHR/RDR/SSS), puerta en (bx+1,by+2)
+  function building(bx,by,kind,name){
+    set(bx,by,'R');set(bx+1,by,'R');set(bx+2,by,'R');
+    set(bx,by+1,'R');set(bx+1,by+1,'H');set(bx+2,by+1,'R');
+    set(bx,by+2,'R');set(bx+1,by+2,'D');set(bx+2,by+2,'R');
+    set(bx,by+3,'S');set(bx+1,by+3,'S');set(bx+2,by+3,'S');
+    TOWN_INFO[(bx+1)+','+(by+2)]=(kind==='cave')?{kind:'cave',name}:{kind:'shop',shop:kind,name};
+  }
+  function npc(x,y,role,name,text){ set(x,y,'N'); TOWN_INFO[x+','+y]={kind:'npc',role,name,text}; }
+  // 6 edificios alrededor de la plaza
+  building(3,7,'weapons','ARMERÍA · Ataque');
+  building(3,17,'armors','ARMADURÍA · Defensa');
+  building(18,7,'potions','BOTICA · Pociones');
+  building(18,17,'powerups','SANTUARIO · Potenciadores');
+  building(8,23,'enchant','TÓTEM · Encantamiento');
+  building(13,23,'repair','HERRERÍA · Reparar');
+  // caminos: avenida central, cruz este-oeste y cabos a cada puerta (cosméticos)
+  vpath(4,27,12); hpath(3,20,14);
+  vpath(10,14,4); vpath(14,20,4); vpath(10,14,19); vpath(14,20,19);
+  vpath(16,26,9); vpath(16,26,14);
+  // entrada del templo (cueva) arriba al centro
+  set(12,3,'C'); set(12,4,'S'); TOWN_INFO['12,3']={kind:'cave',name:'CUEVA DEL TEMPLO'};
+  // nativos junto a la plaza (consejos + pista de objeto sagrado)
+  npc(10,11,'anciano','Anciano de Tenoch','El Rey de Piedra nos ahoga desde su sueño bajo el templo. Hazte fuerte antes de bajar y combina bien tus dones: el ASESINO junto al MAGO castiga de lejos y de cerca; el TANQUE con cualquiera te mantiene en pie. Y oye: bajo el guardián del fondo duerme un OBJETO SAGRADO. Quien lo toca, despierta una fuerza antigua.');
+  npc(14,11,'mercader','Mercader','Cada bestia que matas deja oro. Gástalo: arma en la ARMERÍA, cuero en la ARMADURÍA, y cuando puedas pásate por el TÓTEM a ENCANTAR tu equipo. Los POTENCIADORES del santuario son para siempre. ¿Un consejo? Encanta el arma con Sed de Vida y no caerás fácil.');
+  // decoración: flores sueltas sobre hierba
+  [[5,5],[19,5],[5,27],[19,27],[7,13],[16,13],[6,20],[17,11]].forEach(([x,y])=>{ if(walk(x,y))set(x,y,'F'); });
+  TOWN_ART=g.map(r=>r.join(''));
+}
 
 function buildMap(){
   walls=[];
   let ART;
-  if(G.scene==='town'){ ART=TOWN_ART; MAP_W=16; MAP_H=22; }
+  if(G.scene==='town'){ if(!TOWN_ART.length)buildTown(); ART=TOWN_ART; MAP_W=TOWN_W; MAP_H=TOWN_H; }
   else { ART=CAVE_ART; MAP_W=CAVE_W; MAP_H=CAVE_H; }
   for(let y=0;y<MAP_H;y++){
     let row=[];
@@ -666,18 +702,8 @@ function solid(px,py){
 function solidSide(px,py){
   return tileTypeAt(px,py)===20;
 }
-// qué hay en una puerta/cueva/npc según su posición en el pueblo
-function buildingAt(tx,ty){
-  // puertas: fila 4 (arriba) y fila 11 (abajo)
-  if(ty===4 && tx===2) return {kind:'shop',shop:'weapons',name:'ARMERÍA'};
-  if(ty===4 && tx===10) return {kind:'shop',shop:'armors',name:'ARMADURAS'};
-  if(ty===11 && tx===2) return {kind:'shop',shop:'potions',name:'POCIONES'};
-  if(ty===11 && tx===10) return {kind:'shop',shop:'repair',name:'HERRERÍA (Reparar)'};
-  if(ty===19 && tx===6) return {kind:'cave',name:'CUEVA DEL TEMPLO'};
-  if(ty===14 && tx===3) return {kind:'npc',name:'Anciano de Tenoch',text:'El Rey de Piedra nos ahoga desde su sueño bajo el templo. Muchos bajaron a enfrentarlo... ninguno volvió. Reúne las tres pistas que la selva esconde, forastero, pero antes hazte fuerte. El dios no perdona a los débiles.'};
-  if(ty===14 && tx===11) return {kind:'npc',name:'Mercader',text:'Cada bestia que mates en la cueva te enseña algo de los antiguos, y te hace más fuerte. Junta oro, equípate. Tu arma solo se gasta contra los grandes; repárala aquí antes de que se rompa.'};
-  return null;
-}
+// qué hay en una puerta/cueva/npc según su posición (lookup generado en buildTown)
+function buildingAt(tx,ty){ return TOWN_INFO[tx+','+ty]||null; }
 
 // ---------- entidades ----------
 let mobs=[],clues=[],particles=[],boss=null;
@@ -728,9 +754,9 @@ function enterTown(){
   G.scene='town';
   buildMap();
   mobs=[];clues=[];particles=[];boss=null;
-  G.px=7*TILE+16;G.py=20*TILE+16;     // junto a la entrada de la cueva
+  G.px=12*TILE+16;G.py=18*TILE+16;    // avenida central, bajo la plaza
   G.hp=G.maxhp;G.alive=true;G.iframes=20;G.near=null;
-  document.getElementById('chapter').textContent='PUEBLO DE TENOCH';
+  document.getElementById('chapter').textContent='VILLA DE TENOCH';
   hideAllPanels();updateHUD();
 }
 // compatibilidad: resetWorld llama a la escena correcta
@@ -1610,7 +1636,8 @@ function drawCave(px,py,x,y){
 function drawNPC(px,py,x,y){
   drawGrass(px,py,x,y);
   const cx0=px+16, cy0=py+18;
-  const elder=(x<8);                       // Anciano a la izquierda, Mercader a la derecha
+  const info=TOWN_INFO[x+','+y];
+  const elder = info?info.role==='anciano':(x<MAP_W/2); // según su rol
   const by=cy0+Math.sin(waterFrame*0.06+x)*0.6; // respira/se mece
   cx.fillStyle='rgba(0,25,0,.35)';cx.beginPath();cx.ellipse(cx0,cy0+11,8,3,0,0,7);cx.fill();
   if(elder){
@@ -1950,34 +1977,44 @@ function openShop(kind,title){
 function renderShop(kind){
   document.getElementById('shop-gold').textContent='⬤ '+G.gold;
   const list=document.getElementById('shop-list');list.innerHTML='';
-  let items = kind==='weapons'?SHOP_WEAPONS : kind==='armors'?SHOP_ARMORS : SHOP_POTIONS;
+  let items = kind==='weapons'?SHOP_WEAPONS : kind==='armors'?SHOP_ARMORS :
+              kind==='powerups'?SHOP_POWERS : kind==='enchant'?SHOP_ENCHANTS : SHOP_POTIONS;
   items.forEach(it=>{
     const div=document.createElement('div');div.className='shop-item';
-    let stat='', equipped=false;
-    if(kind==='weapons'){stat='+'+it.dmg+' daño · durab. '+it.maxDur;
+    let stat='', equipped=false, owned=false, label='COMPRAR';
+    if(kind==='weapons'){stat='+'+it.dmg+' daño · durab. '+it.maxDur; label='EQUIPAR';
       if(G.weapon&&G.weapon.id===it.id)equipped=true;}
-    else if(kind==='armors'){stat='+'+it.def+' def · +'+it.hp+' vida · durab. '+it.maxDur;
+    else if(kind==='armors'){stat='+'+it.def+' def · +'+it.hp+' vida · durab. '+it.maxDur; label='EQUIPAR';
       if(G.armor&&G.armor.id===it.id)equipped=true;}
+    else if(kind==='powerups'){stat=it.desc+' · permanente'; label='COMPRAR'; owned=G.powers.has(it.id);}
+    else if(kind==='enchant'){stat=it.desc+' · ('+(it.slot==='weapon'?'arma':'armadura')+')'; label='APLICAR';}
     else {stat = it.heal>=999?'cura total': it.heal>0?('cura '+it.heal+' vida'):
       (it.buff==='dmg'?'+daño temporal':'+defensa temporal');}
-    div.className='shop-item'+(equipped?' equipped':'');
+    const tag = equipped?'[EQUIPADO]': owned?'[ADQUIRIDO]':'';
+    div.className='shop-item'+((equipped||owned)?' equipped':'');
     div.innerHTML='<div class="si-info"><div class="si-name">'+it.name+
-      (equipped?' <span class="si-tag">[EQUIPADO]</span>':'')+
+      (tag?' <span class="si-tag">'+tag+'</span>':'')+
       '</div><div class="si-stat">'+stat+' · '+it.price+' oro</div></div>';
     const btn=document.createElement('button');btn.className='si-buy';
-    btn.textContent = equipped?'PUESTO': (kind==='potions'?'COMPRAR':'EQUIPAR');
-    btn.disabled = equipped || G.gold<it.price;
+    btn.textContent = equipped?'PUESTO': owned?'LISTO': label;
+    btn.disabled = equipped || owned || G.gold<it.price;
     btn.addEventListener('click',()=>buyItem(kind,it));
     div.appendChild(btn);list.appendChild(div);
   });
 }
 function buyItem(kind,it){
   if(G.gold<it.price){shopMsg('No tienes oro suficiente.');return;}
+  if(kind==='powerups' && G.powers.has(it.id)){return;}
+  if(kind==='enchant'){ const t=it.slot==='weapon'?G.weapon:G.armor;
+    if(!t){shopMsg('Necesitas un '+(it.slot==='weapon'?'arma':'armadura')+' equipada.');return;} }
   G.gold-=it.price;
   if(kind==='weapons'){G.weapon={id:it.id,name:it.name,dmg:it.dmg,maxDur:it.maxDur,dur:it.maxDur};
     recalcStats();shopMsg(it.name+' equipada. Daño ahora '+G.dmg+'.');}
   else if(kind==='armors'){G.armor={id:it.id,name:it.name,def:it.def,hp:it.hp,maxDur:it.maxDur,dur:it.maxDur};
     recalcStats();shopMsg(it.name+' equipada. Defensa '+G.defense+'.');}
+  else if(kind==='powerups'){G.powers.add(it.id);it.apply();recalcStats();shopMsg(it.name+': '+it.desc+'.');}
+  else if(kind==='enchant'){const t=it.slot==='weapon'?G.weapon:G.armor;it.apply(t);recalcStats();
+    shopMsg(it.name+' aplicado a tu '+(it.slot==='weapon'?'arma':'armadura')+'.');}
   else { // pociones / tónicos
     if(it.heal>0){G.potions++;shopMsg('Poción comprada. Tienes '+G.potions+'. (usa con L)');}
     else {shopMsg('Tónico aún no implementado en piloto.');G.gold+=it.price;}
@@ -2121,6 +2158,7 @@ function saveGame(){
   savedGame={classes:[...G.classes],resp:G.resp,respMax:G.respMax,
     respLevel:G.respLevel,gold:G.gold,seen:[...G.seen],cluesFound:G.cluesFound,
     weapon:G.weapon?{...G.weapon}:null,armor:G.armor?{...G.armor}:null,potions:G.potions,
+    powers:[...G.powers],lifesteal:G.lifesteal||0,speed:G.speed,atkSpeed:G.atkSpeed,
     baseMaxhp:G.baseMaxhp,baseDmg:G.baseDmg,baseDef:G.baseDef};
   refreshContinue();
 }
@@ -2133,6 +2171,10 @@ function loadGame(){
   G.weapon=savedGame.weapon?{...savedGame.weapon}:null;
   G.armor=savedGame.armor?{...savedGame.armor}:null;
   G.potions=savedGame.potions||0;
+  G.powers=new Set(savedGame.powers||[]);
+  if(savedGame.lifesteal!==undefined)G.lifesteal=savedGame.lifesteal;
+  if(savedGame.speed)G.speed=savedGame.speed;
+  if(savedGame.atkSpeed)G.atkSpeed=savedGame.atkSpeed;
   if(savedGame.baseMaxhp){G.baseMaxhp=savedGame.baseMaxhp;G.baseDmg=savedGame.baseDmg;G.baseDef=savedGame.baseDef;}
   recalcStats();G.hp=G.maxhp;
   document.getElementById('class-screen').style.display='none';

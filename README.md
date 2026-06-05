@@ -62,10 +62,11 @@ fuerte Y te revela secretos. Esto justifica narrativamente la mecánica de progr
 ### Escenas (dos modos de juego en uno)
 El juego tiene **dos vistas distintas** según `G.scene`:
 
-**PUEBLO (`'town'`) — vista cenital (top-down):**
-- Mapa `TOWN_ART` (16×22). Movimiento en 4 direcciones, sin gravedad. Sin combate.
-- 4 tiendas (ARMERÍA/ARMADURAS/POCIONES/HERRERÍA) + 2 NPCs (Anciano, Mercader).
-- Colisión vía `solid()` usando `SOLID_TYPES`.
+**VILLA DE TENOCH (`'town'`) — vista cenital (top-down), mundo abierto:**
+- Mapa **generado por código** en `buildTown()` (24×30, cámara que recorre). `TOWN_ART` y `TOWN_INFO` se llenan ahí; `buildingAt()` consulta `TOWN_INFO["x,y"]`.
+- Plaza central con fuente, 6 edificios (ARMERÍA/Ataque · ARMADURÍA/Defensa · BOTICA/Pociones · SANTUARIO/Potenciadores · TÓTEM/Encantamiento · HERRERÍA/Reparar) + 2 NPCs (Anciano, Mercader) con consejos y pista de objeto sagrado.
+- Tiendas nuevas: `SHOP_POWERS` (mejoras permanentes a stats base, una vez c/u, en `G.powers`) y `SHOP_ENCHANTS` (modifican el arma/armadura equipada). `renderShop`/`buyItem` manejan los kinds `powerups` y `enchant`.
+- Movimiento en 4 direcciones, sin gravedad ni combate. Colisión vía `solid()` usando `SOLID_TYPES`. La hierba es transitable (caminos cosméticos).
 
 **CUEVA (`'dungeon'`) — vista lateral tipo plataformas (estilo Metal Slug en mecánica):**
 - Mapa `CAVE_ART` (40×20, ancho). Avanzas a la derecha.
