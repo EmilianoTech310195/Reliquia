@@ -235,6 +235,14 @@ body.no-crt #crt-overlay{display:none;}
 .menu-btn:active{transform:translateY(2px);box-shadow:none;}
 .menu-btn:hover{border-color:#5fc8e0;background:rgba(30,20,45,.9);color:#fff;}
 .menu-btn.locked{opacity:.35;pointer-events:none;border-color:#5a4a3a;}
+#btn-pause{position:absolute;top:6px;right:8px;z-index:25;width:26px;height:26px;
+  background:rgba(12,8,20,.7);border:2px solid var(--gb-light);color:var(--gb-lightest);
+  font-size:9px;display:flex;align-items:center;justify-content:center;pointer-events:auto;
+  user-select:none;border-radius:4px;cursor:pointer;}
+#btn-pause:active{transform:scale(.92);}
+.vol-row{display:flex;align-items:center;justify-content:center;gap:10px;font-size:9px;color:#e8d8a0;letter-spacing:1px;}
+.vol-btn{padding:8px 14px;}
+#vol-val{min-width:44px;}
 .title-foot{font-size:6px;color:#e8d8a0;opacity:.55;letter-spacing:2px;
   text-shadow:0 1px 3px #000;animation:blink 1.6s steps(2) infinite;}
 @keyframes blink{0%,50%{opacity:.55;}51%,100%{opacity:0;}}
@@ -333,6 +341,22 @@ body.no-crt #crt-overlay{display:none;}
     <div id="class-tag"></div>
     <div id="gear-tag"></div>
     <button id="btn-town">⌂ VOLVER AL PUEBLO</button>
+  </div>
+  <button id="btn-pause">⏸</button>
+  <div class="overlay" id="pause-screen" style="display:none">
+    <h1>PAUSA</h1>
+    <div class="choice-grid">
+      <button class="menu-btn" id="pause-resume">▶ REANUDAR</button>
+      <button class="menu-btn" id="pause-sound">🔊 SONIDO: ON</button>
+      <div class="vol-row">VOL
+        <button class="menu-btn vol-btn" id="vol-down">−</button>
+        <span id="vol-val">55%</span>
+        <button class="menu-btn vol-btn" id="vol-up">+</button>
+      </div>
+      <button class="menu-btn" id="pause-town">⌂ VOLVER A LA VILLA</button>
+      <button class="menu-btn" id="pause-quit">✖ SALIR AL MENÚ</button>
+    </div>
+    <div class="title-foot">progreso guardado automáticamente</div>
   </div>
 
   <div id="clues"></div>
@@ -920,11 +944,11 @@ skillBtn.addEventListener('touchstart',e=>{e.preventDefault();doSkill();});
 skillBtn.addEventListener('mousedown',e=>{e.preventDefault();doSkill();});
 
 // ---------- audio (WebAudio sintetizado, sin archivos externos) ----------
-let AC=null,masterGain=null,musicGain=null,muted=false,musicTimer=null,musicScene=null,musicStep=0;
+let AC=null,masterGain=null,musicGain=null,muted=false,musicTimer=null,musicScene=null,musicStep=0,volume=0.55;
 function initAudio(){
   if(AC)return;
   try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){return;}
-  masterGain=AC.createGain();masterGain.gain.value=0.55;masterGain.connect(AC.destination);
+  masterGain=AC.createGain();masterGain.gain.value=volume;masterGain.connect(AC.destination);
   musicGain=AC.createGain();musicGain.gain.value=0.5;musicGain.connect(masterGain);
 }
 function resumeAudio(){ if(AC&&AC.state==='suspended')AC.resume(); }
@@ -2406,6 +2430,16 @@ function saveGame(){
     weapon:G.weapon?{...G.weapon}:null,armor:G.armor?{...G.armor}:null,potions:G.potions,
     powers:[...G.powers],relics:[...G.relics],goldMult:G.goldMult,lifesteal:G.lifesteal||0,speed:G.speed,atkSpeed:G.atkSpeed,
     baseMaxhp:G.baseMaxhp,baseDmg:G.baseDmg,baseDef:G.baseDef};
+  try{localStorage.setItem('reliquia_save',JSON.stringify({v:1,data:savedGame}));}catch(e){}
+  refreshContinue();
+}
+function clearSave(){ savedGame=null; try{localStorage.removeItem('reliquia_save');}catch(e){} refreshContinue(); }
+function loadSavedFromStorage(){
+  try{
+    const raw=localStorage.getItem('reliquia_save'); if(!raw)return;
+    const obj=JSON.parse(raw); const d=(obj&&obj.data)?obj.data:obj;
+    if(d && Array.isArray(d.classes) && typeof d.gold==='number'){ savedGame=d; } // validación básica
+  }catch(e){ savedGame=null; }
   refreshContinue();
 }
 function hasSave(){return savedGame!==null;}
@@ -2480,6 +2514,38 @@ function refreshContinue(){
   document.getElementById('m-continue').classList.toggle('locked',!hasSave());
 }
 
+// ---------- pausa / ajustes ----------
+let paused=false;
+function refreshPauseUI(){
+  document.getElementById('pause-sound').textContent='🔊 SONIDO: '+(muted?'OFF':'ON');
+  document.getElementById('vol-val').textContent=Math.round(volume*100)+'%';
+  document.getElementById('pause-town').style.display = G.scene==='dungeon'?'block':'none';
+}
+function setVolume(v){ volume=Math.max(0,Math.min(1,Math.round(v*10)/10)); if(masterGain)masterGain.gain.value=volume; refreshPauseUI(); }
+function togglePause(){
+  if(paused){ resumeGame(); return; }
+  if(!G.running) return;                 // solo durante juego activo (no en menús/paneles)
+  paused=true; G.running=false;
+  refreshPauseUI();
+  document.getElementById('pause-screen').style.display='flex';
+}
+function resumeGame(){
+  if(!paused) return; paused=false;
+  document.getElementById('pause-screen').style.display='none';
+  if(G.alive) G.running=true;
+}
+document.getElementById('btn-pause').addEventListener('click',togglePause);
+document.getElementById('pause-resume').addEventListener('click',resumeGame);
+document.getElementById('pause-sound').addEventListener('click',()=>{toggleMute();refreshPauseUI();});
+document.getElementById('vol-down').addEventListener('click',()=>setVolume(volume-0.1));
+document.getElementById('vol-up').addEventListener('click',()=>setVolume(volume+0.1));
+document.getElementById('pause-town').addEventListener('click',()=>{ resumeGame(); enterTown(); G.running=true; });
+document.getElementById('pause-quit').addEventListener('click',()=>{
+  paused=false; document.getElementById('pause-screen').style.display='none'; G.running=false;
+  saveGame(); startTitleLoop(); document.getElementById('title-screen').style.display='flex';
+});
+addEventListener('keydown',e=>{ const k=e.key.toLowerCase(); if(k==='escape'||k==='p')togglePause(); });
+
 // ---------- intro narrativa ----------
 const INTRO_PAGES=[
   'Dicen que los secretos de las viejas culturas no se leen en libros...<br><br>se <span class="em">ganan peleando</span>.',
@@ -2512,6 +2578,7 @@ document.getElementById('intro-next').addEventListener('click',()=>{
 document.getElementById('intro-skip').addEventListener('click',endIntro);
 
 startTitleLoop();
+loadSavedFromStorage();
 loop();
 </script>
 </body>
