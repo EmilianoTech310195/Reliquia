@@ -682,68 +682,79 @@ const CAVE_W=40, CAVE_H=20;
 // chars: G hierba · T árbol · P camino · F flor · S piedra · H pared · D puerta · R tejado · N npc · C cueva · W agua
 let TOWN_ART=[];
 let TOWN_INFO={};            // "x,y" -> {kind:'shop'|'cave'|'npc', ...}
-const TOWN_W=44, TOWN_H=40;
+let TOWN_DECO=[];            // props decorativos por celda (string|0) — la "vida"
+let deco=[];                 // capa de deco de la escena actual
+const TOWN_W=52, TOWN_H=46;
 function buildTown(){
   const W=TOWN_W,H=TOWN_H;
-  const g=[]; for(let y=0;y<H;y++){const row=[];for(let x=0;x<W;x++)row.push('T');g.push(row);}
+  const g=[],dg=[];
+  for(let y=0;y<H;y++){const r=[],dr=[];for(let x=0;x<W;x++){r.push('T');dr.push(0);}g.push(r);dg.push(dr);}
   TOWN_INFO={};
   const inb=(x,y)=>x>=0&&x<W&&y>=0&&y<H;
   const set=(x,y,c)=>{ if(inb(x,y))g[y][x]=c; };
   const get=(x,y)=>inb(x,y)?g[y][x]:'T';
+  const walkable=(x,y)=>{const c=get(x,y);return c==='G'||c==='P'||c==='S'||c==='F';};
+  const prop=(x,y,t)=>{ if(inb(x,y)&&walkable(x,y)&&!dg[y][x])dg[y][x]=t; };
   const carve=(x1,y1,x2,y2,c)=>{ c=c||'G'; for(let y=y1;y<=y2;y++)for(let x=x1;x<=x2;x++)set(x,y,c); };
-  const road=(x1,y1,x2,y2)=>{ // camino en L cosmético sobre hierba
+  const road=(x1,y1,x2,y2)=>{
     for(let x=Math.min(x1,x2);x<=Math.max(x1,x2);x++) if(get(x,y1)==='G')set(x,y1,'P');
     for(let y=Math.min(y1,y2);y<=Math.max(y1,y2);y++) if(get(x2,y)==='G')set(x2,y,'P'); };
   // ----- CLAROS / REGIONES -----
-  carve(14,26,33,37);   // Villa de Tenoch (sur, hub)
-  carve(17,14,28,24);   // Encrucijada central
-  carve(17,4,28,11);    // Claro del Templo (norte)
-  carve(3,12,12,20);    // Claro oeste (Cueva de Jade)
-  carve(31,12,40,20);   // Claro este (Gruta Sombría)
-  // ----- CORREDORES (rutas) que conectan los claros -----
-  carve(21,24,25,26);   // villa <-> encrucijada
-  carve(21,11,25,14);   // encrucijada <-> templo
-  carve(12,16,17,18);   // encrucijada <-> oeste
-  carve(28,16,31,18);   // encrucijada <-> este
-  // ----- AGUA (lago, barrera natural / escenario) -----
-  carve(4,30,12,37,'W');
-  // ----- VILLA: plaza con fuente, 6 edificios, nativos -----
-  carve(20,29,27,33,'S');
-  set(23,31,'W');set(22,31,'W');set(23,30,'W'); // fuente
+  carve(14,28,38,43);   // Villa (hub, sur)
+  carve(22,16,30,27);   // Encrucijada central
+  carve(22,4,31,12);    // Claro del Templo (norte)
+  carve(4,18,14,27);    // Claro oeste (Jade)
+  carve(37,18,47,27);   // Claro este (Gruta)
+  // ----- CORREDORES -----
+  carve(24,27,28,28); carve(24,12,28,16); carve(14,21,22,23); carve(30,21,38,23);
+  // ----- AGUA (lago suroeste) -----
+  carve(4,35,13,43,'W');
+  // ----- PLAZA + fuente -----
+  carve(22,30,30,35,'S');
+  set(26,32,'W');set(25,32,'W');set(26,31,'W');
+  // ----- EDIFICIOS (estandarte en el techo) -----
   function building(bx,by,kind,name){
     set(bx,by,'R');set(bx+1,by,'R');set(bx+2,by,'R');
     set(bx,by+1,'R');set(bx+1,by+1,'H');set(bx+2,by+1,'R');
     set(bx,by+2,'R');set(bx+1,by+2,'D');set(bx+2,by+2,'R');
     set(bx,by+3,'S');set(bx+1,by+3,'S');set(bx+2,by+3,'S');
     TOWN_INFO[(bx+1)+','+(by+2)]={kind:'shop',shop:kind,name};
+    if(inb(bx,by))dg[by][bx]='banner'; if(inb(bx+2,by))dg[by][bx+2]='banner';
   }
-  building(15,26,'weapons','ARMERÍA · Ataque');
-  building(28,26,'potions','BOTICA · Pociones');
-  building(15,31,'armors','ARMADURÍA · Defensa');
-  building(28,31,'powerups','SANTUARIO · Potenciadores');
-  building(16,34,'enchant','TÓTEM · Encantamiento');
-  building(25,34,'repair','HERRERÍA · Reparar');
+  building(14,28,'weapons','ARMERÍA · Ataque');
+  building(35,28,'potions','BOTICA · Pociones');
+  building(14,36,'armors','ARMADURÍA · Defensa');
+  building(35,36,'powerups','SANTUARIO · Potenciadores');
+  building(20,39,'enchant','TÓTEM · Encantamiento');
+  building(29,39,'repair','HERRERÍA · Reparar');
+  // ----- NATIVOS interactivos -----
   function npc(x,y,role,name,text){ set(x,y,'N'); TOWN_INFO[x+','+y]={kind:'npc',role,name,text}; }
-  npc(21,28,'anciano','Anciano de Tenoch','El Rey de Piedra nos ahoga desde su sueño bajo el templo. Hazte fuerte antes de bajar y combina bien tus dones: el ASESINO junto al MAGO castiga de lejos y de cerca; el TANQUE con cualquiera te mantiene en pie. Y oye: bajo el guardián del fondo duerme un OBJETO SAGRADO. Quien lo toca, despierta una fuerza antigua.');
-  npc(26,28,'mercader','Mercader','Cada bestia que matas deja oro. Gástalo: arma en la ARMERÍA, cuero en la ARMADURÍA, y cuando puedas pásate por el TÓTEM a ENCANTAR tu equipo. Los POTENCIADORES del santuario son para siempre. Tres bocas de cueva rodean Tenoch: empieza por la del norte, bajo el templo.');
-  // ----- CUEVAS (ya hechas y enterables) -----
+  npc(24,29,'anciano','Anciano de Tenoch','El Rey de Piedra nos ahoga desde su sueño bajo el templo. Hazte fuerte antes de bajar y combina bien tus dones: el ASESINO junto al MAGO castiga de lejos y de cerca; el TANQUE con cualquiera te mantiene en pie. Y oye: bajo el guardián del fondo duerme un OBJETO SAGRADO. Quien lo toca, despierta una fuerza antigua.');
+  npc(28,29,'mercader','Mercader','Cada bestia que matas deja oro. Gástalo: arma en la ARMERÍA, cuero en la ARMADURÍA, y cuando puedas pásate por el TÓTEM a ENCANTAR tu equipo. Los POTENCIADORES del santuario son para siempre. Tres bocas de cueva rodean Tenoch: empieza por la del norte, bajo el templo.');
+  // ----- CUEVAS -----
   function cave(x,y,name){ set(x,y,'C'); set(x,y+1,'S'); TOWN_INFO[x+','+y]={kind:'cave',name}; }
-  cave(22,5,'CUEVA DEL TEMPLO');   // norte (jefe del Cap. I)
-  cave(6,15,'CUEVA DE JADE');      // oeste
-  cave(37,15,'GRUTA SOMBRÍA');     // este
+  cave(26,5,'CUEVA DEL TEMPLO'); cave(7,22,'CUEVA DE JADE'); cave(44,22,'GRUTA SOMBRÍA');
   // ----- caminos cosméticos -----
-  road(23,33,23,25); road(23,25,23,12); road(23,12,22,6);   // avenida central villa->templo
-  road(17,17,12,17); road(28,17,31,17);                     // rutas oeste/este
-  // ----- decoración: flores en los claros -----
-  [[19,16],[26,22],[8,18],[35,18],[20,7],[30,28],[18,30],[24,22]].forEach(([x,y])=>{ if(get(x,y)==='G')set(x,y,'F'); });
-  TOWN_ART=g.map(r=>r.join(''));
+  road(26,36,26,28); road(26,28,26,16); road(26,16,26,6);
+  road(22,22,14,22); road(30,22,37,22);
+  // ===== VIDA: mercado, props y vecinos =====
+  prop(20,30,'stall'); prop(32,30,'stall'); prop(20,34,'stall'); prop(32,34,'stall');           // puestos
+  prop(21,31,'jar'); prop(31,31,'jar'); prop(23,29,'jar'); prop(24,35,'jar');                     // vasijas
+  prop(21,33,'basket'); prop(31,33,'basket'); prop(29,29,'basket'); prop(28,35,'basket');         // cestos de maíz
+  prop(24,28,'brazier'); prop(28,28,'brazier'); prop(24,36,'brazier'); prop(28,36,'brazier');     // braseros
+  prop(24,16,'brazier'); prop(28,16,'brazier');
+  prop(15,42,'totem'); prop(37,42,'totem'); prop(23,12,'totem'); prop(29,12,'totem'); prop(5,26,'totem'); prop(46,26,'totem'); // tótems
+  prop(18,30,'crate'); prop(34,30,'crate'); prop(18,38,'crate'); prop(34,38,'crate');             // cajones
+  [[21,32],[31,32],[25,38],[29,38],[19,42],[33,42],[26,26],[16,33],[36,33]].forEach(([x,y])=>prop(x,y,'villager')); // vecinos
+  [[24,20],[28,20],[8,20],[43,20],[26,8],[18,41],[34,41],[12,25],[40,25]].forEach(([x,y])=>{ if(get(x,y)==='G')set(x,y,'F'); }); // flores
+  TOWN_ART=g.map(r=>r.join('')); TOWN_DECO=dg;
 }
 
 function buildMap(){
   walls=[];
   let ART;
-  if(G.scene==='town'){ if(!TOWN_ART.length)buildTown(); ART=TOWN_ART; MAP_W=TOWN_W; MAP_H=TOWN_H; }
-  else { if(!curCaveArt.length)curCaveArt=CAVE_ART; ART=curCaveArt; MAP_H=ART.length; MAP_W=ART[0].length; }
+  if(G.scene==='town'){ if(!TOWN_ART.length)buildTown(); ART=TOWN_ART; MAP_W=TOWN_W; MAP_H=TOWN_H; deco=TOWN_DECO; }
+  else { if(!curCaveArt.length)curCaveArt=CAVE_ART; ART=curCaveArt; MAP_H=ART.length; MAP_W=ART[0].length; deco=[]; }
   for(let y=0;y<MAP_H;y++){
     let row=[];
     const src=ART[y]||"";
@@ -755,6 +766,7 @@ function buildMap(){
   }
 }
 const SOLID_TYPES={1:true,2:true,4:true,11:true,14:true,15:true,20:true}; // +roca cueva
+const SOLID_DECO={stall:1,jar:1,basket:1,brazier:1,totem:1,crate:1,villager:1}; // props con colisión (banner no)
 const INTERACT_TYPES={12:true,13:true,14:true};                    // puerta,cueva,npc
 function tileTypeAt(px,py){
   const tx=Math.floor(px/TILE),ty=Math.floor(py/TILE);
@@ -762,7 +774,10 @@ function tileTypeAt(px,py){
   return walls[ty][tx];
 }
 function solid(px,py){
-  return SOLID_TYPES[tileTypeAt(px,py)]===true;
+  if(SOLID_TYPES[tileTypeAt(px,py)]===true)return true;
+  if(deco.length){ const tx=Math.floor(px/TILE),ty=Math.floor(py/TILE);
+    if(deco[ty]&&SOLID_DECO[deco[ty][tx]])return true; }
+  return false;
 }
 // colisión en la cueva: solo la roca (tipo 20) bloquea
 function solidSide(px,py){
@@ -885,7 +900,7 @@ function enterTown(){
   G.scene='town';
   buildMap();
   mobs=[];clues=[];particles=[];boss=null;
-  G.px=23*TILE+16;G.py=35*TILE+16;    // avenida de la villa, bajo la plaza
+  G.px=26*TILE+16;G.py=37*TILE+16;    // avenida de la villa, bajo la plaza
   G.hp=G.maxhp;G.alive=true;G.iframes=20;G.near=null;camSnap=true;startMusic('town');
   document.getElementById('chapter').textContent='VILLA DE TENOCH';
   hideAllPanels();updateHUD();
@@ -1879,6 +1894,83 @@ function drawNPC(px,py,x,y){
   cx.fillStyle='#f0d24a';cx.font='bold 13px monospace';cx.fillText('!',cx0-3,by-21+b);
 }
 
+// ===== props decorativos del pueblo (dan "vida") =====
+function drawProp(t,px,py,x,y){
+  const cx0=px+16, base=py+26;
+  if(t==='banner'){ // estandarte colgando del techo
+    const sway=Math.sin(waterFrame*0.05+x)*1.5;
+    cx.fillStyle='#a04030';cx.beginPath();cx.moveTo(px+10,py);cx.lineTo(px+22,py);cx.lineTo(px+22,py+15+sway);cx.lineTo(px+16,py+11);cx.lineTo(px+10,py+15-sway);cx.closePath();cx.fill();
+    cx.fillStyle='#e8c547';px2(px+14,py+4,4,4,'#e8c547');cx.fillStyle='#2a8a8a';px2(px+15,py+5,2,2,'#2a8a8a');
+    return;
+  }
+  cx.fillStyle='rgba(0,30,0,.28)';cx.beginPath();cx.ellipse(cx0,base+4,9,3,0,0,7);cx.fill(); // sombra
+  if(t==='stall'){ // puesto de mercado con toldo
+    cx.fillStyle='#7a5630';px2(px+4,base-6,3,12,'#7a5630');px2(px+25,base-6,3,12,'#7a5630'); // postes
+    cx.fillStyle='#5a3a1e';rr(px+4,base+1,24,6,1,'#5a3a1e');                                  // mostrador
+    cx.fillStyle='#e86a4a';cx.beginPath();cx.arc(px+10,base,2.4,0,7);cx.fill();
+    cx.fillStyle='#e8c547';cx.beginPath();cx.arc(px+16,base,2.4,0,7);cx.fill();
+    cx.fillStyle='#3aaaaa';cx.beginPath();cx.arc(px+22,base,2.4,0,7);cx.fill();
+    for(let i=0;i<5;i++){cx.fillStyle=i%2?'#c0392b':'#e8c547';cx.beginPath();cx.moveTo(px+3+i*6,base-6);cx.lineTo(px+9+i*6,base-6);cx.lineTo(px+6+i*6,base-2);cx.closePath();cx.fill();}
+    cx.fillStyle='#8a2a22';px2(px+2,base-8,28,3,'#8a2a22');                                   // borde toldo
+    return;
+  }
+  if(t==='jar'){ // vasijas de barro
+    [[-5,1],[4,0],[0,4]].forEach(([ox,oy])=>{const jx=cx0+ox,jy=base-2+oy;
+      cx.fillStyle='#b5703a';cx.beginPath();cx.ellipse(jx,jy,4,5,0,0,7);cx.fill();
+      cx.fillStyle='#8a5028';cx.beginPath();cx.ellipse(jx,jy+3,4,2,0,0,7);cx.fill();
+      cx.fillStyle='#d89858';cx.beginPath();cx.ellipse(jx-1,jy-1,1.5,2,0,0,7);cx.fill();
+      cx.fillStyle='#5a3418';px2(jx-3,jy-4,6,1.5,'#5a3418');});
+    return;
+  }
+  if(t==='basket'){ // cesto de maíz
+    cx.fillStyle='#9a6a32';cx.beginPath();cx.ellipse(cx0,base,8,6,0,0,7);cx.fill();
+    cx.fillStyle='#7a5226';cx.beginPath();cx.ellipse(cx0,base+2,8,4,0,0,7);cx.fill();
+    cx.fillStyle='#e8c547';for(let i=0;i<4;i++){cx.beginPath();cx.ellipse(cx0-4+i*3,base-5,2,4,0,0,7);cx.fill();}
+    cx.fillStyle='#6aa83a';px2(cx0-5,base-8,2,4,'#6aa83a');px2(cx0+4,base-8,2,4,'#6aa83a');
+    return;
+  }
+  if(t==='brazier'){ // brasero con fuego
+    cx.fillStyle='#5a5a52';px2(cx0-2,base-2,4,8,'#5a5a52');
+    cx.fillStyle='#6e6e62';cx.beginPath();cx.ellipse(cx0,base-3,7,3,0,0,7);cx.fill();
+    cx.fillStyle='#3a3a32';cx.beginPath();cx.ellipse(cx0,base-3,5,2,0,0,7);cx.fill();
+    const fl=Math.sin(waterFrame*0.3+x)*2, fl2=Math.cos(waterFrame*0.2+x)*1.5;
+    cx.save();cx.globalCompositeOperation='lighter';
+    const g=cx.createRadialGradient(cx0,base-8,1,cx0,base-8,18);g.addColorStop(0,'rgba(255,170,60,.4)');g.addColorStop(1,'rgba(255,170,60,0)');
+    cx.fillStyle=g;cx.beginPath();cx.arc(cx0,base-8,18,0,7);cx.fill();cx.restore();
+    cx.fillStyle='#c4401a';cx.beginPath();cx.ellipse(cx0,base-7+fl,3.5,7,0,0,7);cx.fill();
+    cx.fillStyle='#e8852a';cx.beginPath();cx.ellipse(cx0,base-7+fl2,2.5,5,0,0,7);cx.fill();
+    cx.fillStyle='#f0d24a';cx.beginPath();cx.ellipse(cx0,base-6+fl,1.3,3,0,0,7);cx.fill();
+    return;
+  }
+  if(t==='totem'){ // tótem azteca tallado
+    cx.fillStyle='#6a6258';rr(cx0-6,base-20,12,26,2,'#6a6258');
+    cx.fillStyle='#544e46';rr(cx0+3,base-20,3,26,1,'#544e46');
+    for(let i=0;i<3;i++){const fy=base-17+i*9;
+      cx.fillStyle='#3a3630';rr(cx0-4,fy,8,7,1,'#3a3630');
+      cx.fillStyle=['#e8c547','#3aaaaa','#c0392b'][i];cx.beginPath();cx.arc(cx0-2,fy+3,1.2,0,7);cx.fill();cx.beginPath();cx.arc(cx0+2,fy+3,1.2,0,7);cx.fill();
+      cx.fillStyle='#8a8276';px2(cx0-3,fy+5,6,1.5,'#8a8276');}
+    cx.fillStyle='#1f8a4a';cx.beginPath();cx.moveTo(cx0-4,base-20);cx.lineTo(cx0-6,base-26);cx.lineTo(cx0-1,base-21);cx.fill();
+    cx.fillStyle='#e8c547';cx.beginPath();cx.moveTo(cx0+1,base-21);cx.lineTo(cx0+2,base-27);cx.lineTo(cx0+5,base-20);cx.fill();
+    return;
+  }
+  if(t==='crate'){ // cajón de madera
+    cx.fillStyle='#7a5226';rr(cx0-7,base-8,14,14,1,'#7a5226');
+    cx.fillStyle='#9a6a36';px2(cx0-7,base-8,14,2,'#9a6a36');
+    cx.fillStyle='#5a3a18';px2(cx0-7,base-2,14,2,'#5a3a18');px2(cx0-1,base-8,2,14,'#5a3a18');
+    return;
+  }
+  if(t==='villager'){ // vecino ambiental (no interactivo)
+    const by=base-2+Math.sin(waterFrame*0.05+x*1.3)*0.8;
+    const pal=[['#8a5a8a','#caa0d0'],['#5a8a6a','#a0d0b0'],['#8a7a4a','#d0c090'],['#6a6a9a','#a0a0d0']][(x*3+y)%4];
+    cx.fillStyle=pal[0];cx.beginPath();cx.moveTo(cx0-6,by-3);cx.quadraticCurveTo(cx0-7,by+8,cx0-5,by+9);cx.lineTo(cx0+5,by+9);cx.quadraticCurveTo(cx0+7,by+8,cx0+6,by-3);cx.closePath();cx.fill();
+    cx.fillStyle=pal[1];cx.beginPath();cx.ellipse(cx0,by-2,6,3,0,0,7);cx.fill();
+    cx.fillStyle='#e0a878';cx.beginPath();cx.arc(cx0,by-8,5,0,7);cx.fill();
+    cx.fillStyle='#3a2a1a';cx.beginPath();cx.arc(cx0,by-9,5,Math.PI,0);cx.fill();
+    cx.fillStyle='#222';cx.beginPath();cx.arc(cx0-2,by-8,1,0,7);cx.fill();cx.beginPath();cx.arc(cx0+2,by-8,1,0,7);cx.fill();
+    return;
+  }
+}
+
 // ruido determinista por celda (para texturas estables, no titilantes)
 function cellRnd(x,y,s){let n=(x*374761393+y*668265263+s*982451653)>>>0;n=(n^(n>>13))*1274126177>>>0;return (n%1000)/1000;}
 
@@ -1921,6 +2013,10 @@ function render(){
     else if(t===13)drawCave(px,py,x,y);      // cueva
     else if(t===14)drawNPC(px,py,x,y);       // NPC
     else if(t===22)drawTorch(px,py,x,y);     // antorcha de pared
+  }
+  // props decorativos del pueblo (la "vida": mercado, vecinos, tótems...)
+  if(G.scene==='town' && deco.length){
+    for(let y=0;y<MAP_H;y++)for(let x=0;x<MAP_W;x++){ const d=deco[y]&&deco[y][x]; if(d)drawProp(d,x*TILE,y*TILE,x,y); }
   }
   // pistas (pergamino dorado flotante con destello)
   // portal de salida del nivel: arco de piedra con energía azteca
