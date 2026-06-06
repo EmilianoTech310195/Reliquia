@@ -59,8 +59,12 @@ fuerte Y te revela secretos. Esto justifica narrativamente la mecánica de progr
 - `walls` — matriz de tipos de tile del mapa actual. `MAP_W`/`MAP_H` son **variables** (cambian según escena).
 - `TILE` = tamaño de tile en px. Canvas lógico 320×576 aprox (vertical, móvil).
 
-### Escenas (dos modos de juego en uno)
-El juego tiene **dos vistas distintas** según `G.scene`:
+### Escenas (tres modos según `G.scene`)
+- **`'town'`** — la **Villa de Tenoch** (hub de tiendas/NPCs, top-down). Se sale al capítulo por el **sendero** (tile `kind:'sendero'` arriba).
+- **`'worldmap'`** — el **MAPA DEL CAPÍTULO I**: `buildWorldmap()` genera un sendero serpenteante (44×64) con **15 nodos-nivel + 1 nodo de jefe** (`CH1`/`CH1_NODES`) sobre bosque. Top-down, reusa el movimiento/colisión del pueblo (`curInfo`=`WMAP_INFO`). Cada nodo se dibuja con `drawNode()` según estado: **superado ✓ / actual (halo) / bloqueado 🔒**. Desbloqueo por `G.progress` (persistido). Punto de regreso a la villa (`kind:'return'`).
+- **`'dungeon'`** — un **nivel temático** (lateral). Al pisar un nodo desbloqueado → `enterNode(i)` → `loadLevel()` genera UN nivel con `genCave(i, bias)` y la paleta del tipo (`LEVEL_TYPES`: selva/cueva/pantano/ruinas/boss → afecta `drawCaveAir`/`drawCaveRock`/`applyZoneTint` y la mezcla de enemigos). El portal del fondo → `returnToMap()` (marca superado, vuelve al mapa, desbloquea el siguiente). Nodo 16 = jefe.
+
+(Vista clásica de referencia, dos modos:)
 
 **MUNDO DE TENOCH (`'town'`) — vista cenital (top-down), overworld abierto (principio tipo Kanto):**
 - Mapa **generado por código** en `buildTown()` (**52×46**, cámara que recorre). Base de **bosque (árboles sólidos)**; las **rutas-corredor** y los **claros/regiones** se tallan como hierba transitable. `TOWN_ART`/`TOWN_INFO` se llenan ahí; `buildingAt()` consulta `TOWN_INFO["x,y"]`.

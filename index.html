@@ -533,6 +533,7 @@ const G={
   seen:new Set(),       // tipos de monstruo ya vistos
   cluesFound:0,cluesTotal:3,
   chapter:1,level:1,levelsTotal:15,   // progresión del capítulo
+  node:1,progress:0,                  // nodo actual y nodos superados (desbloqueo)
   bossUnlocked:false,bossSpawned:false,
   alive:true,running:false,
   skillCD:0,skillMax:90,
@@ -607,6 +608,34 @@ const CAVE_THEMES={
   'CUEVA DE JADE':   {tint:[20,55,38],  accent:'#3fe0a0', glow:[80,230,150], bossName:'GUARDIÁN DE JADE', bias:['reptil','arana']},
   'GRUTA SOMBRÍA':   {tint:[42,22,58],  accent:'#b070ff', glow:[150,90,255], bossName:'GUARDIÁN SOMBRÍO',bias:['espectro','murcielago']},
 };
+// ===== CAPÍTULO I: tipos de entorno (paleta/atmósfera/enemigos) =====
+const LEVEL_TYPES={
+  selva:  {label:'Selva',  tint:[20,55,28], accent:'#7fe04a', glow:[120,224,74],  bias:['reptil','arana'],     airTop:'#1e3a1f', airBot:'#0e2012', rock:'#5a6e38', rockDark:'#33421d', edge:'#8aa850'},
+  cueva:  {label:'Cueva',  tint:[60,30,15], accent:'#ff7a2a', glow:[255,150,40],  bias:null,                   airTop:'#241b2c', airBot:'#15101e', rock:'#62534a', rockDark:'#352b27', edge:'#80705f'},
+  pantano:{label:'Pantano',tint:[28,48,42], accent:'#6ad0c0', glow:[106,208,192], bias:['baba','espectro'],    airTop:'#172a26', airBot:'#0a1714', rock:'#3e5248', rockDark:'#22332c', edge:'#5e7a6a'},
+  ruinas: {label:'Ruinas', tint:[72,56,26], accent:'#e8c547', glow:[232,197,71],  bias:['guardian','reptil'],  airTop:'#2e2820', airBot:'#181410', rock:'#8a7a56', rockDark:'#564832', edge:'#b6a276'},
+  boss:   {label:'Templo', tint:[50,20,40], accent:'#ff7a2a', glow:[255,150,40],  bias:null,                   airTop:'#241b2c', airBot:'#140e1c', rock:'#62534a', rockDark:'#352b27', edge:'#80705f'},
+};
+// 15 niveles variados + el jefe (nodo 16) — el "camino" del Capítulo I
+const CH1=[
+  {name:'Sendero de la Selva', type:'selva'},
+  {name:'Charca Podrida',      type:'pantano'},
+  {name:'Cueva de Jade',       type:'cueva'},
+  {name:'Ruinas Menores',      type:'ruinas'},
+  {name:'Espesura Verde',      type:'selva'},
+  {name:'Gruta Húmeda',        type:'cueva'},
+  {name:'Pantano Brumoso',     type:'pantano'},
+  {name:'Ruinas Hundidas',     type:'ruinas'},
+  {name:'Cornisa del Jaguar',  type:'selva'},
+  {name:'Gruta Sombría',       type:'cueva'},
+  {name:'La Ciénaga',          type:'pantano'},
+  {name:'Galería de Ídolos',   type:'ruinas'},
+  {name:'Selva Profunda',      type:'selva'},
+  {name:'La Cripta',           type:'cueva'},
+  {name:'Atrio del Templo',    type:'ruinas'},
+  {name:'REY DE PIEDRA',       type:'boss'},
+];
+let CH1_NODES=[]; // {i,type,name,x,y} posiciones en el mapa del capítulo (las llena buildWorldmap)
 
 // ---------- mundo: mapa de tiles 16-bit (bosque y río) ----------
 // tipos: 0=hierba  1=árbol(sólido)  2=agua(sólido)  3=camino tierra  4=arbusto(sólido)  5=flores(hierba)
@@ -645,6 +674,8 @@ const CHAR2TYPE={G:0,T:1,W:2,P:3,B:4,F:5,
   C:13, // cueva entrada (transitable, dispara interacción)
   N:14, // NPC (sólido, interactúa al estar cerca)
   R:15, // tejado/decoración (sólido)
+  n:16, // nodo-nivel del mapa del capítulo (transitable, interacción)
+  e:17, // punto de regreso a la villa (transitable, interacción)
   // tiles de la cueva lateral:
   X:20, // roca sólida (suelo/pared/plataforma)
   '.':21, // aire (cueva, fondo oscuro)
@@ -685,6 +716,10 @@ let TOWN_INFO={};            // "x,y" -> {kind:'shop'|'cave'|'npc', ...}
 let TOWN_DECO=[];            // props decorativos por celda (string|0) — la "vida"
 let deco=[];                 // capa de deco de la escena actual
 const TOWN_W=52, TOWN_H=46;
+// ---- mapa del capítulo (escena 'worldmap') ----
+let WMAP_ART=[], WMAP_INFO={}, WMAP_DECO=[];
+const WMAP_W=44, WMAP_H=64;
+let curInfo={};              // lookup de interacción de la escena top-down actual
 function buildTown(){
   const W=TOWN_W,H=TOWN_H;
   const g=[],dg=[];
@@ -733,7 +768,7 @@ function buildTown(){
   npc(28,29,'mercader','Mercader','Cada bestia que matas deja oro. Gástalo: arma en la ARMERÍA, cuero en la ARMADURÍA, y cuando puedas pásate por el TÓTEM a ENCANTAR tu equipo. Los POTENCIADORES del santuario son para siempre. Tres bocas de cueva rodean Tenoch: empieza por la del norte, bajo el templo.');
   // ----- CUEVAS -----
   function cave(x,y,name){ set(x,y,'C'); set(x,y+1,'S'); TOWN_INFO[x+','+y]={kind:'cave',name}; }
-  cave(26,5,'CUEVA DEL TEMPLO'); cave(7,22,'CUEVA DE JADE'); cave(44,22,'GRUTA SOMBRÍA');
+  set(26,5,'C'); set(26,6,'S'); TOWN_INFO['26,5']={kind:'sendero',name:'CAMINO DE TENOCH'}; // salida al mapa del capítulo
   // ----- caminos cosméticos -----
   road(26,36,26,28); road(26,28,26,16); road(26,16,26,6);
   road(22,22,14,22); road(30,22,37,22);
@@ -749,12 +784,39 @@ function buildTown(){
   [[24,20],[28,20],[8,20],[43,20],[26,8],[18,41],[34,41],[12,25],[40,25]].forEach(([x,y])=>{ if(get(x,y)==='G')set(x,y,'F'); }); // flores
   TOWN_ART=g.map(r=>r.join('')); TOWN_DECO=dg;
 }
+// ===== MAPA DEL CAPÍTULO I: sendero serpenteante con 15 nodos + jefe =====
+function buildWorldmap(){
+  const W=WMAP_W,H=WMAP_H;
+  const g=[],dg=[];
+  for(let y=0;y<H;y++){const r=[],dr=[];for(let x=0;x<W;x++){r.push('T');dr.push(0);}g.push(r);dg.push(dr);}
+  WMAP_INFO={}; CH1_NODES=[];
+  const inb=(x,y)=>x>=0&&x<W&&y>=0&&y<H;
+  const set=(x,y,c)=>{ if(inb(x,y))g[y][x]=c; };
+  const get=(x,y)=>inb(x,y)?g[y][x]:'T';
+  const carve=(x1,y1,x2,y2,c)=>{ c=c||'G'; for(let y=Math.min(y1,y2);y<=Math.max(y1,y2);y++)for(let x=Math.min(x1,x2);x<=Math.max(x1,x2);x++)set(x,y,c); };
+  const trail=(x1,y1,x2,y2)=>{ for(let x=Math.min(x1,x2);x<=Math.max(x1,x2);x++){set(x,y1,'P');set(x,y1+1,'P');}
+    for(let y=Math.min(y1,y2);y<=Math.max(y1,y2);y++){set(x2,y,'P');set(x2+1,y,'P');} };
+  const prop=(x,y,t)=>{ if(inb(x,y)&&(get(x,y)==='G'||get(x,y)==='P')&&!dg[y][x])dg[y][x]=t; };
+  const N=CH1.length;
+  for(let k=0;k<N;k++){ const t=k/(N-1), ny=58-Math.round(t*53), nx=22+Math.round(Math.sin(k*0.7)*14);
+    CH1_NODES.push({i:k+1,type:CH1[k].type,name:CH1[k].name,x:nx,y:ny}); }
+  const rx=22,ry=61;
+  CH1_NODES.forEach((nd,idx)=>{ carve(nd.x-2,nd.y-2,nd.x+2,nd.y+2,'G');
+    const prev= idx===0?{x:rx,y:ry}:CH1_NODES[idx-1]; trail(prev.x,prev.y,nd.x,nd.y); });
+  carve(rx-2,ry-2,rx+2,ry+1,'G');
+  CH1_NODES.forEach(nd=>{ set(nd.x,nd.y,'n'); WMAP_INFO[nd.x+','+nd.y]={kind:'node',i:nd.i,type:nd.type,name:nd.name}; });
+  set(rx,ry,'e'); WMAP_INFO[rx+','+ry]={kind:'return',name:'VILLA DE TENOCH'};
+  // ambiente junto al sendero
+  CH1_NODES.forEach((nd,idx)=>{ if(idx%3===0)prop(nd.x-3,nd.y,'totem'); if(idx%3===1)prop(nd.x+3,nd.y,'brazier'); if(idx%4===2)prop(nd.x+3,nd.y-1,'crate'); });
+  WMAP_ART=g.map(r=>r.join('')); WMAP_DECO=dg;
+}
 
 function buildMap(){
   walls=[];
   let ART;
-  if(G.scene==='town'){ if(!TOWN_ART.length)buildTown(); ART=TOWN_ART; MAP_W=TOWN_W; MAP_H=TOWN_H; deco=TOWN_DECO; }
-  else { if(!curCaveArt.length)curCaveArt=CAVE_ART; ART=curCaveArt; MAP_H=ART.length; MAP_W=ART[0].length; deco=[]; }
+  if(G.scene==='town'){ if(!TOWN_ART.length)buildTown(); ART=TOWN_ART; MAP_W=TOWN_W; MAP_H=TOWN_H; deco=TOWN_DECO; curInfo=TOWN_INFO; }
+  else if(G.scene==='worldmap'){ if(!WMAP_ART.length)buildWorldmap(); ART=WMAP_ART; MAP_W=WMAP_W; MAP_H=WMAP_H; deco=WMAP_DECO; curInfo=WMAP_INFO; }
+  else { if(!curCaveArt.length)curCaveArt=CAVE_ART; ART=curCaveArt; MAP_H=ART.length; MAP_W=ART[0].length; deco=[]; curInfo={}; }
   for(let y=0;y<MAP_H;y++){
     let row=[];
     const src=ART[y]||"";
@@ -767,10 +829,10 @@ function buildMap(){
 }
 const SOLID_TYPES={1:true,2:true,4:true,11:true,14:true,15:true,20:true}; // +roca cueva
 const SOLID_DECO={stall:1,jar:1,basket:1,brazier:1,totem:1,crate:1,villager:1}; // props con colisión (banner no)
-const INTERACT_TYPES={12:true,13:true,14:true};                    // puerta,cueva,npc
+const INTERACT_TYPES={12:true,13:true,14:true,16:true,17:true};    // puerta,cueva,npc,nodo,regreso
 function tileTypeAt(px,py){
   const tx=Math.floor(px/TILE),ty=Math.floor(py/TILE);
-  if(tx<0||ty<0||tx>=MAP_W||ty>=MAP_H)return G.scene==='town'?1:20;
+  if(tx<0||ty<0||tx>=MAP_W||ty>=MAP_H)return (G.scene==='dungeon')?20:1;
   return walls[ty][tx];
 }
 function solid(px,py){
@@ -784,7 +846,7 @@ function solidSide(px,py){
   return tileTypeAt(px,py)===20;
 }
 // qué hay en una puerta/cueva/npc según su posición (lookup generado en buildTown)
-function buildingAt(tx,ty){ return TOWN_INFO[tx+','+ty]||null; }
+function buildingAt(tx,ty){ return (curInfo&&curInfo[tx+','+ty])||null; }
 
 // ---------- entidades ----------
 let mobs=[],clues=[],particles=[],boss=null;
@@ -852,21 +914,22 @@ function genArena(){ // sala del jefe (plana con esquive)
 }
 function loadLevel(){
   mobs=[];particles=[];boss=null;clues=[];portal=null;altar=null;chests=[];G.bossSpawned=false;camSnap=true;startMusic('cave');
-  if(G.level>G.levelsTotal){                       // tras el nivel 15: el jefe
+  const node=CH1[G.node-1]||CH1[0];
+  G.envTheme=LEVEL_TYPES[node.type]||LEVEL_TYPES.cueva;
+  G.caveTheme=G.envTheme; G.caveName=node.name;
+  if(node.type==='boss'){                       // nodo 16: el jefe
     const a=genArena(); curCaveArt=a.art; buildMap();
     G.px=3*TILE+16;G.py=(a.H-5)*TILE;G.vy=0;G.grounded=false;
     G.hp=G.maxhp;G.alive=true;G.iframes=40;G.near=null;
     spawnBoss();
-  } else {
-    const lv=genCave(G.level, G.caveTheme&&G.caveTheme.bias); curCaveArt=lv.art; buildMap();
-    lv.spawns.forEach(s=>spawnMob(s.type,s.tx,s.ty,G.level));
+  } else {                                       // un nivel temático por nodo
+    const lv=genCave(G.node, G.envTheme.bias); curCaveArt=lv.art; buildMap();
+    lv.spawns.forEach(s=>spawnMob(s.type,s.tx,s.ty,G.node));
     chests=(lv.chests||[]).map(c=>({x:c.tx*TILE+16, y:(lv.H-2)*TILE-10, open:false}));
     portal={x:lv.exitTx*TILE+16, y:(lv.H-2)*TILE-12, t:0};
     G.px=2*TILE+16;G.py=(lv.H-5)*TILE;G.vy=0;G.grounded=false;
-    // atrición: solo curación total al iniciar el run; entre niveles, parcial
-    G.hp = (G.level<=1)? G.maxhp : Math.min(G.maxhp, G.hp+Math.round(G.maxhp*0.4));
-    G.alive=true;G.iframes=40;G.near=null;
-    document.getElementById('chapter').textContent=G.caveName+' · Nivel '+G.level+'/'+G.levelsTotal;
+    G.hp=G.maxhp;G.alive=true;G.iframes=40;G.near=null;
+    document.getElementById('chapter').textContent='Nivel '+G.node+'/15 · '+node.name+' ('+G.envTheme.label+')';
   }
   hideAllPanels();updateHUD();
 }
@@ -882,19 +945,29 @@ function openChest(c){
   for(let i=0;i<12;i++)particles.push({type:'spark',x:c.x,y:c.y-6,dx:(Math.random()-.5)*3,dy:-Math.random()*3,life:24,col:'#e8c547'});
   showToast('¡COFRE!',msg); updateHUD(); saveGame();
 }
-function advanceLevel(){
-  playSfx('portal');G.level++;
-  if(G.level>G.levelsTotal) showToast('ÚLTIMO PASO','El templo tiembla...<br>algo colosal despierta abajo.');
-  else showToast('NIVEL SUPERADO','Avanzas más hondo.<br>Nivel '+G.level+'/'+G.levelsTotal+'.');
-  saveGame(); loadLevel();
-}
-function enterDungeon(full,name){
-  G.scene='dungeon';
-  G.caveName=name||'CUEVA DEL TEMPLO';
-  G.caveTheme=CAVE_THEMES[G.caveName]||CAVE_THEMES['CUEVA DEL TEMPLO'];
-  if(full) G.level=1;
+// entrar a un nodo-nivel del capítulo
+function enterNode(i){
+  G.scene='dungeon'; G.node=i; G.level=i;
   loadLevel();
   if(!G.godWarned){ G.godWarned=true; showGodModal(); }
+}
+// nivel superado -> vuelve al mapa del capítulo y desbloquea el siguiente
+function returnToMap(){
+  playSfx('portal');
+  if(G.node>G.progress) G.progress=G.node;
+  showToast('¡NIVEL SUPERADO!',(CH1[G.node-1]?CH1[G.node-1].name:'')+'<br>nuevo destino desbloqueado.');
+  saveGame(); enterWorldmap(G.node);
+}
+// entrar al mapa del capítulo (escena worldmap)
+function enterWorldmap(atNode){
+  G.scene='worldmap';
+  buildMap();
+  mobs=[];clues=[];particles=[];boss=null;
+  const nd = atNode? CH1_NODES[Math.min(atNode,CH1_NODES.length)-1] : null;
+  if(nd){ G.px=nd.x*TILE+16; G.py=nd.y*TILE+16; } else { G.px=22*TILE+16; G.py=61*TILE+16; }
+  G.hp=G.maxhp;G.alive=true;G.iframes=20;G.near=null;G.running=true;camSnap=true;startMusic('town');
+  document.getElementById('chapter').textContent='CAMINO DE TENOCH — Cap. I';
+  hideAllPanels();updateHUD();
 }
 function enterTown(){
   G.scene='town';
@@ -905,8 +978,8 @@ function enterTown(){
   document.getElementById('chapter').textContent='VILLA DE TENOCH';
   hideAllPanels();updateHUD();
 }
-// compatibilidad: resetWorld llama a la escena correcta
-function resetWorld(full){ enterDungeon(full); }
+// compatibilidad: resetWorld lleva al mapa del capítulo
+function resetWorld(full){ enterWorldmap(1); }
 
 // ---------- clases + equipo ----------
 function applyClasses(){
@@ -1131,8 +1204,8 @@ function update(){
 
   if(!G.running||!G.alive)return;
 
-  // ============ PUEBLO: movimiento cenital ============
-  if(G.scene==='town'){
+  // ============ VILLA / MAPA DEL CAPÍTULO: movimiento cenital ============
+  if(G.scene==='town'||G.scene==='worldmap'){
     let mx=0,my=0;
     if(keys['arrowup']||keys['w']||touchDir.up){my=-1;G.dir='up';}
     else if(keys['arrowdown']||keys['s']||touchDir.down){my=1;G.dir='down';}
@@ -1219,7 +1292,7 @@ function update(){
 
   // portal de salida: llegar al fondo avanza de nivel
   if(portal){ portal.t++;
-    if(Math.hypot(G.px-portal.x,G.py-portal.y)<22){ advanceLevel(); return; }
+    if(Math.hypot(G.px-portal.x,G.py-portal.y)<22){ returnToMap(); return; }
   }
   // altar del objeto sagrado: tocarlo lo reclama
   if(altar){ altar.t++;
@@ -1727,8 +1800,9 @@ function isRock(x,y){
   return walls[y][x]===20;
 }
 function drawCaveAir(px,py,x,y){
-  // fondo de caverna con profundidad (degradado oscuro, tono cálido morado)
-  vGrad(px,py,TILE,TILE,'#241b2c','#15101e');
+  // fondo según el entorno del nivel (selva/cueva/pantano/ruinas)
+  const E=G.envTheme||LEVEL_TYPES.cueva;
+  vGrad(px,py,TILE,TILE,E.airTop,E.airBot);
   const r=cellRnd(x,y,3);
   // rocas lejanas difusas: siluetas suaves y redondeadas (menos frecuentes)
   if(r>.72){
@@ -1757,8 +1831,9 @@ function drawCaveAir(px,py,x,y){
 }
 function drawCaveRock(px,py,x,y){
   const top=!isRock(x,y-1), bot=!isRock(x,y+1), lft=!isRock(x-1,y), rgt=!isRock(x+1,y);
-  // cuerpo de piedra labrada (cálida, más clara arriba)
-  vGrad(px,py,TILE,TILE,'#62534a','#352b27');
+  // cuerpo según el entorno del nivel
+  const E=G.envTheme||LEVEL_TYPES.cueva;
+  vGrad(px,py,TILE,TILE,E.rock,E.rockDark);
   const r=cellRnd(x,y,5), r2=cellRnd(x,y,11);
   // facetas talladas (planos suaves en vez de manchas circulares)
   cx.fillStyle='rgba(255,238,210,.05)';
@@ -1779,7 +1854,7 @@ function drawCaveRock(px,py,x,y){
   }
   // ---- BORDES expuestos al aire (relieve + luz cálida de antorchas) ----
   if(top){
-    cx.fillStyle='#80705f';
+    cx.fillStyle=E.edge;
     cx.beginPath();cx.moveTo(px,py+3);
     for(let i=0;i<=TILE;i+=8){cx.lineTo(px+i,py+(cellRnd(x*9+i,y,2)*4|0));}
     cx.lineTo(px+TILE,py+3);cx.lineTo(px+TILE,py);cx.lineTo(px,py);cx.closePath();cx.fill();
@@ -1970,6 +2045,25 @@ function drawProp(t,px,py,x,y){
     return;
   }
 }
+// marcador de nodo en el mapa del capítulo (estado: superado/actual/bloqueado)
+function drawNode(nd){
+  const x=nd.x*TILE+16, y=nd.y*TILE+16;
+  const cleared=nd.i<=G.progress, current=nd.i===G.progress+1, locked=nd.i>G.progress+1, boss=nd.type==='boss';
+  const typeCol={selva:'#5fae3a',cueva:'#9a8a6a',pantano:'#4f8a72',ruinas:'#e8c547',boss:'#c0392b'}[nd.type]||'#888';
+  cx.fillStyle='rgba(0,20,0,.4)';cx.beginPath();cx.ellipse(x,y+8,11,4,0,0,7);cx.fill();
+  cx.fillStyle=cleared?'#5a6e4a':current?'#7a6a3a':'#403c34';
+  cx.beginPath();cx.arc(x,y,boss?13:10,0,7);cx.fill();
+  cx.fillStyle=typeCol;cx.beginPath();cx.arc(x,y,boss?9:7,0,7);cx.fill();
+  if(boss){ cx.fillStyle='#dcd8c8';cx.beginPath();cx.arc(x,y-1,4.5,0,7);cx.fill();
+    cx.fillStyle='#201f1a';cx.beginPath();cx.arc(x-1.6,y-1,1,0,7);cx.fill();cx.beginPath();cx.arc(x+1.6,y-1,1,0,7);cx.fill(); }
+  if(locked){ cx.fillStyle='rgba(0,0,0,.5)';cx.beginPath();cx.arc(x,y,boss?13:10,0,7);cx.fill();
+    cx.strokeStyle='#cfcfcf';cx.lineWidth=1.6;cx.beginPath();cx.arc(x,y-1,2.4,Math.PI,0);cx.stroke();
+    cx.fillStyle='#cfcfcf';rr(x-3,y-1,6,5,1,'#cfcfcf'); }
+  else if(cleared){ cx.strokeStyle='#eaffea';cx.lineWidth=2.4;cx.lineCap='round';cx.beginPath();cx.moveTo(x-4,y);cx.lineTo(x-1,y+3);cx.lineTo(x+5,y-4);cx.stroke();cx.lineCap='butt'; }
+  if(current){ const r=(boss?16:13)+Math.sin(waterFrame*0.12)*2;
+    cx.save();cx.globalAlpha=0.5+Math.sin(waterFrame*0.12)*0.4;cx.strokeStyle='#ffe070';cx.lineWidth=2;cx.beginPath();cx.arc(x,y,r,0,7);cx.stroke();cx.restore(); }
+  cx.fillStyle='#fff7d0';cx.font='6px monospace';cx.textAlign='center';cx.fillText(boss?'JEFE':(''+nd.i),x,y+18);cx.textAlign='left';
+}
 
 // ruido determinista por celda (para texturas estables, no titilantes)
 function cellRnd(x,y,s){let n=(x*374761393+y*668265263+s*982451653)>>>0;n=(n^(n>>13))*1274126177>>>0;return (n%1000)/1000;}
@@ -1997,6 +2091,7 @@ function render(){
     else if(t===10)drawStone(px,py,x,y);     // piedra pueblo
     else if(t===12)drawStone(px,py,x,y);     // suelo bajo puerta
     else if(t===13)drawStone(px,py,x,y);     // suelo bajo cueva
+    else if(t===16||t===17)drawPath(px,py,x,y); // base de nodo / regreso (sendero)
     else if(t===20)drawCaveRock(px,py,x,y);  // roca cueva (sólida)
     else if(t===21)drawCaveAir(px,py,x,y);   // aire/fondo cueva
     else if(t===22)drawCaveAir(px,py,x,y);   // (antorcha se dibuja encima)
@@ -2014,10 +2109,12 @@ function render(){
     else if(t===14)drawNPC(px,py,x,y);       // NPC
     else if(t===22)drawTorch(px,py,x,y);     // antorcha de pared
   }
-  // props decorativos del pueblo (la "vida": mercado, vecinos, tótems...)
-  if(G.scene==='town' && deco.length){
+  // props decorativos (la "vida": mercado, vecinos, tótems...) en villa y mapa del capítulo
+  if((G.scene==='town'||G.scene==='worldmap') && deco.length){
     for(let y=0;y<MAP_H;y++)for(let x=0;x<MAP_W;x++){ const d=deco[y]&&deco[y][x]; if(d)drawProp(d,x*TILE,y*TILE,x,y); }
   }
+  // nodos del mapa del capítulo (estado: superado / actual / bloqueado)
+  if(G.scene==='worldmap'){ CH1_NODES.forEach(nd=>drawNode(nd)); }
   // pistas (pergamino dorado flotante con destello)
   // portal de salida del nivel: arco de piedra con energía azteca
   if(portal){ const x=portal.x, y=portal.y, t=portal.t*0.12;
@@ -2252,7 +2349,7 @@ function updateHUD(){
   document.getElementById('btn-town').style.display = G.scene==='dungeon'?'block':'none';
   // ocultar controles de combate en el pueblo
   const az=document.getElementById('action-zone');
-  if(az)az.style.visibility = G.scene==='town'?'hidden':'visible';
+  if(az)az.style.visibility = (G.scene==='dungeon')?'visible':'hidden';
 }
 
 // ---------- toast ----------
@@ -2283,6 +2380,7 @@ function claimRelic(r){
 // ---------- win ----------
 function winGame(relic,already){
   if(boss)boss.alive=false;
+  G.progress=Math.max(G.progress,CH1.length); // capítulo completado
   G.running=false;G.gold+=200;
   wearEquipment(40); // el jefe desgasta fuerte el equipo
   const rn=relic?relic.name:'RELIQUIA SAGRADA', rd=relic?(' — '+relic.desc):'';
@@ -2304,19 +2402,24 @@ function hideAllPanels(){
 function hidePrompt(){document.getElementById('prompt-box').style.display='none';}
 function showPrompt(b){
   const box=document.getElementById('prompt-box');
-  document.getElementById('prompt-title').textContent=
-    b.kind==='cave'?('Entrar a '+b.name+'?'):
-    b.kind==='npc'?('Hablar con '+b.name+'?'):('Entrar a '+b.name+'?');
+  let title;
+  if(b.kind==='npc') title='Hablar con '+b.name+'?';
+  else if(b.kind==='sendero') title='Salir al CAMINO DE TENOCH?';
+  else if(b.kind==='return') title='Volver a la VILLA?';
+  else if(b.kind==='node') title = (b.i>G.progress+1) ? ('🔒 '+b.name+' (bloqueado)') : ('Nivel '+b.i+': '+b.name+'?');
+  else title='Entrar a '+b.name+'?';
+  document.getElementById('prompt-title').textContent=title;
   box.style.display='flex';
 }
 document.getElementById('prompt-skip').addEventListener('click',()=>{hidePrompt();});
 document.getElementById('prompt-enter').addEventListener('click',()=>{
   const b=G.near; if(!b)return; hidePrompt();
-  if(b.kind==='cave'){ G.running=true; enterDungeon(true, b.name); }
+  if(b.kind==='sendero'){ G.running=true; enterWorldmap(Math.min(G.progress+1,CH1.length)); }
+  else if(b.kind==='return'){ G.running=true; enterTown(); }
+  else if(b.kind==='node'){ if(b.i>G.progress+1){ playSfx('error'); showToast('BLOQUEADO','Primero supera el destino anterior.'); }
+    else { G.running=true; enterNode(b.i); } }
   else if(b.kind==='npc'){ openNPC(b); }
-  else if(b.kind==='shop'){
-    if(b.shop==='repair')openRepair(); else openShop(b.shop,b.name);
-  }
+  else if(b.kind==='shop'){ if(b.shop==='repair')openRepair(); else openShop(b.shop,b.name); }
 });
 
 // ----- NPC -----
@@ -2522,7 +2625,7 @@ document.getElementById('next-btn').addEventListener('click',()=>{
 let savedGame=null;
 function saveGame(){
   savedGame={classes:[...G.classes],resp:G.resp,respMax:G.respMax,
-    respLevel:G.respLevel,gold:G.gold,seen:[...G.seen],cluesFound:G.cluesFound,
+    respLevel:G.respLevel,gold:G.gold,seen:[...G.seen],cluesFound:G.cluesFound,progress:G.progress,
     weapon:G.weapon?{...G.weapon}:null,armor:G.armor?{...G.armor}:null,potions:G.potions,
     powers:[...G.powers],relics:[...G.relics],goldMult:G.goldMult,lifesteal:G.lifesteal||0,speed:G.speed,atkSpeed:G.atkSpeed,
     baseMaxhp:G.baseMaxhp,baseDmg:G.baseDmg,baseDef:G.baseDef};
@@ -2548,6 +2651,7 @@ function loadGame(){
   G.armor=savedGame.armor?{...savedGame.armor}:null;
   G.potions=savedGame.potions||0;
   G.powers=new Set(savedGame.powers||[]);
+  G.progress=savedGame.progress||0;
   G.relics=new Set(savedGame.relics||[]);
   if(savedGame.goldMult)G.goldMult=savedGame.goldMult;
   if(savedGame.lifesteal!==undefined)G.lifesteal=savedGame.lifesteal;
