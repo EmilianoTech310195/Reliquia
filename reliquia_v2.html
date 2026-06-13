@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RELIQUIA v2 — Phaser (flat)</title>
+<style>
+  html,body{margin:0;height:100%;background:#0d160d;overflow:hidden;}
+  body{display:flex;align-items:center;justify-content:center;font-family:monospace;}
+  #hint{position:fixed;top:6px;left:0;right:0;text-align:center;color:#8bac0f;font-size:12px;z-index:10;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="hint">RELIQUIA v2 (Phaser · estilo flat) — mover con WASD / flechas</div>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+<script>
+const OUT=0x1b1320; // contorno oscuro común
+const MAP_W=30*32, MAP_H=20*32;
+
+// ---------- generación de texturas en estilo FLAT (relleno plano + contorno) ----------
+function texHero(scene){
+  const g=scene.make.graphics({add:false}); const cx=20;
+  g.lineStyle(3,OUT,1);
+  // piernas + botas
+  g.fillStyle(0x7a6a3a);g.fillRoundedRect(cx-9,46,7,12,2);g.strokeRoundedRect(cx-9,46,7,12,2);
+  g.fillRoundedRect(cx+2,46,7,12,2);g.strokeRoundedRect(cx+2,46,7,12,2);
+  g.fillStyle(0x3a2a18);g.fillRoundedRect(cx-10,55,9,6,2);g.strokeRoundedRect(cx-10,55,9,6,2);
+  g.fillRoundedRect(cx+1,55,9,6,2);g.strokeRoundedRect(cx+1,55,9,6,2);
+  // torso (chaqueta)
+  g.fillStyle(0x8a5a2a);g.fillRoundedRect(cx-12,26,24,22,5);g.strokeRoundedRect(cx-12,26,24,22,5);
+  // camisa
+  g.fillStyle(0xd8c890);g.fillRoundedRect(cx-4,28,8,14,2);g.strokeRoundedRect(cx-4,28,8,14,2);
+  // cinturón
+  g.fillStyle(0x3a2a18);g.fillRect(cx-12,42,24,4);g.strokeRect(cx-12,42,24,4);
+  // cabeza
+  g.fillStyle(0xe8b079);g.fillCircle(cx,16,9);g.strokeCircle(cx,16,9);
+  // ojos
+  g.fillStyle(OUT);g.fillCircle(cx-3,16,1.7);g.fillCircle(cx+3,16,1.7);
+  // sombrero: ala + copa
+  g.fillStyle(0x6e4424);g.fillEllipse(cx,11,34,11);g.strokeEllipse(cx,11,34,11);
+  g.fillStyle(0x5a3418);g.fillRoundedRect(cx-9,0,18,12,4);g.strokeRoundedRect(cx-9,0,18,12,4);
+  g.generateTexture('hero',40,64);g.destroy();
+}
+function texBaba(scene){
+  const g=scene.make.graphics({add:false}); const cx=18,cy=14;
+  g.lineStyle(3,OUT,1);
+  g.fillStyle(0x5a9a2e);g.fillRoundedRect(cx-14,cy-8,28,18,9);g.strokeRoundedRect(cx-14,cy-8,28,18,9);
+  g.fillStyle(0x76c23e);g.fillEllipse(cx-3,cy-4,18,9); // luz plana (sin contorno)
+  g.fillStyle(0xffffff);g.fillCircle(cx-5,cy-2,4);g.strokeCircle(cx-5,cy-2,4);g.fillCircle(cx+5,cy-2,4);g.strokeCircle(cx+5,cy-2,4);
+  g.fillStyle(OUT);g.fillCircle(cx-4,cy-1,1.8);g.fillCircle(cx+6,cy-1,1.8);
+  g.generateTexture('baba',36,30);g.destroy();
+}
+function texTree(scene){
+  const g=scene.make.graphics({add:false}); const cx=20;
+  g.lineStyle(3,OUT,1);
+  g.fillStyle(0x6e4a28);g.fillRect(cx-4,34,8,18);g.strokeRect(cx-4,34,8,18);
+  g.fillStyle(0x2f9a3a);g.fillCircle(cx,24,18);g.strokeCircle(cx,24,18);
+  g.fillStyle(0x46b84a);g.fillCircle(cx-5,18,8); // luz plana
+  g.generateTexture('tree',40,56);g.destroy();
+}
+function texGrass(scene){
+  const g=scene.make.graphics({add:false});
+  g.fillStyle(0x5cbf4a);g.fillRect(0,0,32,32);
+  g.fillStyle(0x52b340);for(let y=0;y<32;y+=12)for(let x=0;x<32;x+=12)g.fillRect(x,y,6,6);
+  g.lineStyle(2,0x2e7a26,1);
+  g.beginPath();g.moveTo(8,22);g.lineTo(6,15);g.moveTo(22,12);g.lineTo(24,6);g.moveTo(16,30);g.lineTo(14,24);g.strokePath();
+  g.generateTexture('grass',32,32);g.destroy();
+}
+
+function preload(){}
+let player, cursors, keys, babas;
+function create(){
+  texGrass(this);texHero(this);texTree(this);texBaba(this);
+  // fondo de hierba (tileSprite = eficiente)
+  this.add.tileSprite(0,0,MAP_W,MAP_H,'grass').setOrigin(0,0);
+  // árboles sólidos (estáticos)
+  const trees=this.physics.add.staticGroup();
+  [[5,3],[9,7],[14,2],[20,5],[24,9],[7,13],[16,15],[26,3],[3,16],[22,14],[12,10],[27,16]]
+    .forEach(([tx,ty])=>{const t=trees.create(tx*32+16,ty*32+16,'tree');t.setSize(20,16).setOffset(10,34).refreshBody();t.setDepth(t.y);});
+  // babas que deambulan
+  babas=this.physics.add.group();
+  [[8,5],[18,8],[12,12],[23,6]].forEach(([tx,ty])=>{const b=babas.create(tx*32+16,ty*32+16,'baba');
+    b.setData('t',Math.random()*6);b.setCollideWorldBounds(true);});
+  // jugador
+  player=this.physics.add.sprite(15*32,10*32,'hero');
+  player.setSize(20,16).setOffset(10,46).setCollideWorldBounds(true);
+  this.physics.add.collider(player,trees);
+  this.physics.add.collider(babas,trees);
+  // cámara
+  this.physics.world.setBounds(0,0,MAP_W,MAP_H);
+  this.cameras.main.setBounds(0,0,MAP_W,MAP_H);
+  this.cameras.main.startFollow(player,true,0.12,0.12);
+  this.cameras.main.setBackgroundColor('#274a1c');
+  // input
+  cursors=this.input.keyboard.createCursorKeys();
+  keys=this.input.keyboard.addKeys('W,A,S,D');
+}
+function update(time,delta){
+  if(!player)return;
+  const sp=150, b=player.body; let vx=0,vy=0;
+  if(cursors.left.isDown||keys.A.isDown)vx=-1; else if(cursors.right.isDown||keys.D.isDown)vx=1;
+  if(cursors.up.isDown||keys.W.isDown)vy=-1; else if(cursors.down.isDown||keys.S.isDown)vy=1;
+  const len=Math.hypot(vx,vy)||1; b.setVelocity(vx/len*sp, vy/len*sp);
+  if(vx<0)player.setFlipX(true); else if(vx>0)player.setFlipX(false);
+  player.setDepth(player.y); // orden por profundidad (top-down)
+  // babas deambulan suave
+  babas.children.iterate(o=>{ if(!o)return; const t=time*0.001+o.getData('t');
+    o.body.setVelocity(Math.cos(t)*30, Math.sin(t*1.3)*30); o.setDepth(o.y); });
+}
+
+const config={
+  type:Phaser.AUTO, width:480, height:320, backgroundColor:'#274a1c',
+  pixelArt:false, roundPixels:true,
+  scale:{ mode:Phaser.Scale.FIT, autoCenter:Phaser.Scale.CENTER_BOTH },
+  physics:{ default:'arcade', arcade:{ debug:false } },
+  scene:{ preload, create, update }
+};
+new Phaser.Game(config);
+</script>
+</body>
+</html>
