@@ -1406,7 +1406,75 @@ function dotp(x,y,r,c){cx.beginPath();cx.arc(x,y,r,0,7);cx.fillStyle=c;cx.fill()
 // ===== SPRITES =====
 // Héroe EXPLORADOR: base aventurero (sombrero, chaqueta, mochila) + detalles de clase.
 // Centro en (cx0,cy0), mira a 'dir', anima con 'frame'.
+// ===== Sprite pixel-art del héroe (explorador) — se hornea una sola vez =====
+const HERO_PAL={'.':null,'0':'#000000','H':'#8B5A2B','a':'#CD853F','Y':'#FFD700','U':'#4169E1','J':'#C3B091','e':'#E6D8B8','B':'#8B7D6B','T':'#D2B48C','f':'#F5DEB3','S':'#FFD1A9','k':'#FFA07A','G':'#00FFCC','i':'#E0FFFF','O':'#4A3B32'};
+const HERO_ROWS=[
+'................................',
+'................................',
+'............00000...............',
+'...........0HHHHH0..............',
+'..........0HaHHHaH0.............',
+'........0000000000000...........',
+'...........0SSSSS0..............',
+'...........0S0S0S0..............',
+'...........0kSSSk0..............',
+'..........0J0kSk0J0.............',
+'.........0JJJ000JJJ0...GG.......',
+'........0JeJJJBJJeJJ0.GiiG......',
+'........0JJJJB.BJJJS0GiGiG......',
+'.......0BBJJB...BJSS0.GiG.......',
+'.......0BYUBBBBBBJ00..GG........',
+'.......0BBBB0BBB0B0.............',
+'....0000S0BB0BBB0B0.............',
+'...0HHHH000TTTTTT00.............',
+'..0H000HH0TfTTTfTT0.............',
+'..0H0.0HH0TTTTTTTT0.............',
+'..0H0.0HH0TTT00TTT0.............',
+'...0H00H0.0TT00TT0..............',
+'....0000..0TT00TT0..............',
+'..........0OO00OO0..............',
+'..........0OO00OO0..............',
+'..........0OB00OB0..............',
+'.........0OOO00OOO0.............',
+'.........0000000000.............',
+'................................',
+'................................',
+'................................',
+'................................'];
+let heroCv=null,heroCvW=null;   // sprite normal + silueta blanca (flash de daño)
+function buildHeroSprite(){
+  heroCv=document.createElement('canvas');heroCv.width=32;heroCv.height=32;
+  heroCvW=document.createElement('canvas');heroCvW.width=32;heroCvW.height=32;
+  const c=heroCv.getContext('2d'),cw=heroCvW.getContext('2d');
+  for(let y=0;y<HERO_ROWS.length;y++){const row=HERO_ROWS[y];
+    for(let x=0;x<row.length;x++){const col=HERO_PAL[row[x]];
+      if(col){c.fillStyle=col;c.fillRect(x,y,1,1);cw.fillStyle='#ffffff';cw.fillRect(x,y,1,1);}}}
+}
+const HERO_AX=13.5,HERO_AY=27.5,HERO_F=1.7;   // ancla (pies) + escala a px de juego
+// Héroe = sprite pixel-art (espejo por dirección, rebote al caminar, flash de daño, impulso de golpe/salto/retroceso)
 function drawHero(cx0,cy0,dir,frame,moving){
+  if(!heroCv)buildHeroSprite();
+  const air=(G.scene==='dungeon' && !G.grounded);
+  const atkP=G.atkTimer>0?G.atkTimer/Math.max(1,G.atkSpeed):0;
+  const swing=Math.sin((1-atkP)*Math.PI);
+  const lungeX=(dir==='left'?-1:dir==='right'?1:0)*swing*3;
+  const lungeY=(dir==='up'?-1:dir==='down'?1:0)*swing*2;
+  const rec=G.hurtT>0?G.hurtT/12:0;
+  const recX=(dir==='left'?1:dir==='right'?-1:0)*rec*4;
+  const recY=(dir==='up'?1:dir==='down'?-1:0)*rec*3;
+  const bob=(moving&&!air)?(frame%2?-1:0):0;
+  cx.fillStyle='rgba(0,25,0,.4)';cx.beginPath();cx.ellipse(cx0,cy0+15,11,4,0,0,7);cx.fill(); // sombra
+  const flip=(dir==='left')?-1:1;
+  cx.save();
+  cx.imageSmoothingEnabled=false;
+  cx.translate(cx0+lungeX+recX, cy0+15+lungeY+recY+bob);
+  cx.scale(flip,1);
+  cx.drawImage(heroCv, -HERO_AX*HERO_F, -HERO_AY*HERO_F, 32*HERO_F, 32*HERO_F);
+  if(rec>0){cx.globalAlpha=Math.min(1,rec*0.6);cx.drawImage(heroCvW, -HERO_AX*HERO_F, -HERO_AY*HERO_F, 32*HERO_F, 32*HERO_F);cx.globalAlpha=1;}
+  cx.restore();
+}
+// (versión procedural anterior, conservada como respaldo)
+function drawHeroProcedural(cx0,cy0,dir,frame,moving){
   const cls=G.classes;
   const isTank=cls.includes('tanque'), isMage=cls.includes('mago'), isAss=cls.includes('asesino');
   const step=moving?[0,2,0,-2][frame]:0;
